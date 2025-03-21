@@ -1,0 +1,122 @@
+/* SchemaNode.css */
+.schema-node {
+  width: 250px;
+  border-radius: 12px;
+  background-color: white;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.schema-node:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.15);
+}
+
+.schema-node-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(to right, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.schema-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: #3b82f6;
+  margin-right: 12px;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.4);
+}
+
+.schema-node-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.schema-node-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.schema-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.schema-field:nth-child(even) {
+  background-color: rgba(241, 245, 249, 0.5);
+}
+
+.schema-field-name {
+  display: flex;
+  align-items: center;
+}
+
+.schema-field-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+}
+
+.schema-field-label {
+  font-weight: 500;
+  font-size: 14px;
+  color: #334155;
+}
+
+.schema-field-type {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 500;
+}
+
+.show-more-button {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 8px;
+  text-align: center;
+  color: #3b82f6;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.show-more-button:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Handle styles */
+.schema-handle-source, .schema-handle-target {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.schema-handle-target {
+  background-color: #3b82f6;
+  top: -5px;
+}
+
+.schema-handle-source {
+  background-color: #10b981;
+  bottom: -5px;
+} 
