@@ -20,7 +20,7 @@ const SchemaPage = () => {
     height: window.innerHeight
   });
   const pageRef = useRef(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatMessages, setChatMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -663,8 +663,7 @@ const SchemaPage = () => {
             >
               <SchemaFlow 
                 schema={schema} 
-                onModifyPrompt={handleModifyPrompt} 
-                onSchemaChange={handleSchemaChange}
+                readOnly={true}
                 key={`flow-${windowSize.width}-${windowSize.height}-${sidebarOpen ? 'sidebar' : 'nosidebar'}`} // Recreate on resize
               />
             </motion.div>

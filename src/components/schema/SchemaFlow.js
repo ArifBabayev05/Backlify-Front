@@ -29,7 +29,7 @@ const edgeTypes = {
   schemaEdge: SchemaEdge,
 };
 
-const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange }) => {
+const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -68,6 +68,9 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange }) => {
   // Handle connections when user creates new edges
   const onConnect = useCallback(
     (params) => {
+      // Skip in readOnly mode
+      if (readOnly) return;
+      
       // Instead of automatically creating the edge, open the relationship manager
       const sourceNode = nodes.find(node => node.id === params.source);
       const targetNode = nodes.find(node => node.id === params.target);
@@ -82,7 +85,7 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange }) => {
         setRelationshipManagerOpen(true);
       }
     },
-    [nodes]
+    [nodes, readOnly]
   );
 
   // Set up the flow when schema changes
@@ -161,14 +164,18 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange }) => {
 
   // Handle node click to show details
   const onNodeClick = useCallback((event, node) => {
-    setSelectedNode(node);
-  }, []);
+    if (!readOnly) {
+      setSelectedNode(node);
+    }
+  }, [readOnly]);
 
   // Handle edge click to edit relationship
   const onEdgeClick = useCallback((event, edge) => {
+    if (readOnly) return;
+    
     setSelectedEdge(edge);
     setRelationshipManagerOpen(true);
-  }, []);
+  }, [readOnly]);
 
   // Add a new table
   const handleAddTable = () => {
@@ -418,136 +425,126 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange }) => {
               </div>
             </Panel>
             
-            {/* Schema Actions Panel */}
-            <Panel position="top-left" style={{ margin: '10px' }}>
-              <div className="d-flex flex-column gap-2">
-                <motion.button
-                  className="btn d-flex align-items-center justify-content-center rounded p-2"
-                  style={{ 
-                    background: 'rgba(59, 130, 246, 0.9)',
-                    color: 'white',
-                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
-                    border: 'none',
-                    width: 'auto',
-                    paddingLeft: '12px',
-                    paddingRight: '12px'
-                  }}
-                  onClick={handleAddTable}
-                  whileHover={{ backgroundColor: 'rgba(59, 130, 246, 1)', y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Table
-                </motion.button>
-                
-                {selectedNode && (
-                  <motion.button
-                    className="btn d-flex align-items-center justify-content-center rounded p-2"
-                    style={{ 
-                      background: 'rgba(16, 185, 129, 0.9)',
-                      color: 'white',
-                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
-                      border: 'none',
-                      width: 'auto',
-                      paddingLeft: '12px',
-                      paddingRight: '12px'
-                    }}
-                    onClick={() => handleEditTable(selectedNode)}
-                    whileHover={{ backgroundColor: 'rgba(16, 185, 129, 1)', y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                    Edit Selected Table
-                  </motion.button>
-                )}
-                
-                {selectedNode && (
-                  <motion.button
-                    className="btn d-flex align-items-center justify-content-center rounded p-2"
-                    style={{ 
-                      background: 'rgba(239, 68, 68, 0.9)',
-                      color: 'white',
-                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
-                      border: 'none',
-                      width: 'auto',
-                      paddingLeft: '12px',
-                      paddingRight: '12px'
-                    }}
-                    onClick={() => handleDeleteTable(selectedNode.id)}
-                    whileHover={{ backgroundColor: 'rgba(239, 68, 68, 1)', y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete Selected Table
-                  </motion.button>
-                )}
-                
-                {selectedEdge && (
-                  <motion.button
-                    className="btn d-flex align-items-center justify-content-center rounded p-2"
-                    style={{ 
-                      background: 'rgba(239, 68, 68, 0.9)',
-                      color: 'white',
-                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
-                      border: 'none',
-                      width: 'auto',
-                      paddingLeft: '12px',
-                      paddingRight: '12px'
-                    }}
-                    onClick={() => handleDeleteRelationship(selectedEdge.id)}
-                    whileHover={{ backgroundColor: 'rgba(239, 68, 68, 1)', y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete Selected Relationship
-                  </motion.button>
-                )}
-              </div>
-            </Panel>
+            {(!readOnly && selectedNode || selectedEdge) && (
+              <Panel position="bottom-left" style={{ margin: '10px' }}>
+                <div className="d-flex flex-column gap-2">
+                  {selectedNode && (
+                    <motion.button
+                      className="btn d-flex align-items-center justify-content-center rounded p-2"
+                      style={{ 
+                        background: 'rgba(16, 185, 129, 0.9)',
+                        color: 'white',
+                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+                        border: 'none',
+                        width: 'auto',
+                        paddingLeft: '12px',
+                        paddingRight: '12px'
+                      }}
+                      onClick={() => handleEditTable(selectedNode)}
+                      whileHover={{ backgroundColor: 'rgba(16, 185, 129, 1)', y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      Edit Selected Table
+                    </motion.button>
+                  )}
+                  
+                  {selectedNode && (
+                    <motion.button
+                      className="btn d-flex align-items-center justify-content-center rounded p-2"
+                      style={{ 
+                        background: 'rgba(239, 68, 68, 0.9)',
+                        color: 'white',
+                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+                        border: 'none',
+                        width: 'auto',
+                        paddingLeft: '12px',
+                        paddingRight: '12px'
+                      }}
+                      onClick={() => handleDeleteTable(selectedNode.id)}
+                      whileHover={{ backgroundColor: 'rgba(239, 68, 68, 1)', y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Selected Table
+                    </motion.button>
+                  )}
+                  
+                  {selectedEdge && (
+                    <motion.button
+                      className="btn d-flex align-items-center justify-content-center rounded p-2"
+                      style={{ 
+                        background: 'rgba(239, 68, 68, 0.9)',
+                        color: 'white',
+                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+                        border: 'none',
+                        width: 'auto',
+                        paddingLeft: '12px',
+                        paddingRight: '12px'
+                      }}
+                      onClick={() => handleDeleteRelationship(selectedEdge.id)}
+                      whileHover={{ backgroundColor: 'rgba(239, 68, 68, 1)', y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Selected Relationship
+                    </motion.button>
+                  )}
+                </div>
+              </Panel>
+            )}
+            
+            {/* Floating action button to add new table */}
+            {!readOnly && (
+              <Panel position="top-left" style={{ margin: '10px' }}>
+                <div className="d-flex flex-column gap-2">
+                  {/* No buttons here for read-only view */}
+                </div>
+              </Panel>
+            )}
           </ReactFlow>
           
           {/* Floating action button to add new table */}
-          <motion.div 
-            className="position-absolute" 
-            style={{ bottom: '32px', right: '32px', zIndex: 10 }}
-            initial={{ opacity: 0, scale: 0, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ delay: 0.5, type: "spring", stiffness: 400, damping: 15 }}
-          >
-            <motion.div
-              whileHover={{ scale: 1.1, boxShadow: '0 8px 25px rgba(59, 130, 246, 0.5)' }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+          {!readOnly && (
+            <motion.div 
+              className="position-absolute" 
+              style={{ bottom: '32px', right: '32px', zIndex: 10 }}
+              initial={{ opacity: 0, scale: 0, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ delay: 0.5, type: "spring", stiffness: 400, damping: 15 }}
             >
-              <Button
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{ 
-                  width: '60px', 
-                  height: '60px', 
-                  background: 'linear-gradient(145deg, #3b82f6, #2563eb)',
-                  border: 'none',
-                  boxShadow: '0 8px 20px rgba(59, 130, 246, 0.4)'
-                }}
-                onClick={handleAddTable}
+              <motion.div
+                whileHover={{ scale: 1.1, boxShadow: '0 8px 25px rgba(59, 130, 246, 0.5)' }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 10 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </Button>
+                <Button
+                  className="rounded-circle d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: '60px', 
+                    height: '60px', 
+                    background: 'linear-gradient(145deg, #3b82f6, #2563eb)',
+                    border: 'none',
+                    boxShadow: '0 8px 20px rgba(59, 130, 246, 0.4)'
+                  }}
+                  onClick={handleAddTable}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </Button>
+              </motion.div>
             </motion.div>
-          </motion.div>
+          )}
           
           {/* Table Editor Modal */}
           <TableEditor 
@@ -567,6 +564,29 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange }) => {
             onUpdateRelationship={handleUpdateRelationship}
             relationshipToEdit={selectedEdge}
           />
+
+          {/* Table Editor Modal - only show when not in readOnly mode */}
+          {!readOnly && (
+            <TableEditor 
+              isOpen={tableEditorOpen} 
+              onClose={() => setTableEditorOpen(false)} 
+              onSave={handleSaveTable}
+              table={editingTable}
+            />
+          )}
+          
+          {/* Relationship Manager Modal - only show when not in readOnly mode */}
+          {!readOnly && (
+            <RelationshipManager 
+              isOpen={relationshipManagerOpen} 
+              onClose={() => setRelationshipManagerOpen(false)}
+              tables={nodes}
+              edges={edges}
+              onAddRelationship={handleAddRelationship}
+              onUpdateRelationship={handleUpdateRelationship}
+              relationshipToEdit={selectedEdge}
+            />
+          )}
         </div>
       </ReactFlowProvider>
     </div>
