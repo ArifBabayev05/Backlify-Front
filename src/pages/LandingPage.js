@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Container, Row, Col } from 'react-bootstrap';
 import PromptInput from '../components/landing/PromptInput';
 import LoadingAnimation from '../components/common/LoadingAnimation';
-import ThemeToggle from '../components/common/ThemeToggle';
 import ExamplePromptCard from '../components/common/ExamplePromptCard';
 import { useNavigate } from 'react-router-dom';
 import dbIcon from '../assets/images/db-1.png';
@@ -245,10 +244,7 @@ const LandingPage = () => {
         />
       </div>
       
-      {/* Theme toggle with improved positioning */}
-      <div className="position-fixed" style={{ top: '24px', right: '24px', zIndex: 100 }}>
-        <ThemeToggle />
-      </div>
+   
       
       {/* Content - no 3D effect on the container */}
       <div 

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Button } from 'react-bootstrap';
+import { Button, Form, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import SchemaFlow from '../components/schema/SchemaFlow';
-import ThemeToggle from '../components/common/ThemeToggle';
 import LoadingAnimation from '../components/common/LoadingAnimation';
 
 // Remove or comment out the mock data
@@ -20,6 +19,20 @@ const SchemaPage = () => {
     height: window.innerHeight
   });
   const pageRef = useRef(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom of chat messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
 
   useEffect(() => {
     // Get the prompt from sessionStorage
@@ -177,9 +190,63 @@ const SchemaPage = () => {
     }, 3000);
   };
 
-  const handleGenerateEndpoints = () => {
-    // Navigate to endpoints page
-    navigate('/endpoints');
+  const handleGenerateEndpoints = async () => {
+    try {
+      // Show loading animation
+      setIsLoading(true);
+      
+      // Get current schema data from sessionStorage
+      const schemaDataString = sessionStorage.getItem('schemaData');
+      if (!schemaDataString) {
+        throw new Error('No schema data available');
+      }
+      
+      const schemaData = JSON.parse(schemaDataString);
+      
+      // Prepare the request payload
+      const payload = {
+        tables: schemaData.tables,
+        userId: schemaData.tables[0]?.prefixedName?.split('_')[0] || 'Supabasev2'
+      };
+      
+      console.log('Sending API generation request:', payload);
+      
+      // Send the request to create API from schema
+      const response = await fetch('http://localhost:3000/create-api-from-schema', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('Received API generation response:', responseData);
+      
+      if (!responseData.success) {
+        throw new Error('API generation was unsuccessful');
+      }
+      
+      // Store the API response in sessionStorage so the endpoints page can access it
+      sessionStorage.setItem('apiEndpoints', JSON.stringify(responseData));
+      
+      // Navigate to endpoints page with the API data
+      navigate('/endpoints');
+      
+    } catch (error) {
+      console.error('Error generating API endpoints:', error);
+      
+      // Show error alert
+      alert(`Failed to generate API endpoints: ${error.message}`);
+      
+    } finally {
+      // Hide loading animation
+      setIsLoading(false);
+    }
   };
 
   const handleRefreshSchema = () => {
@@ -214,6 +281,172 @@ const SchemaPage = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Handle sending a new prompt to the chatbot
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    
+    if (!currentMessage.trim()) return;
+    
+    // Add user message to chat
+    const newMessage = { 
+      id: Date.now(), 
+      text: currentMessage, 
+      sender: 'user' 
+    };
+    
+    setChatMessages(prev => [...prev, newMessage]);
+    setCurrentMessage('');
+    setIsSending(true);
+    
+    try {
+      // Get the current schema data from sessionStorage
+      const schemaDataString = sessionStorage.getItem('schemaData');
+      if (!schemaDataString) {
+        throw new Error('No schema data available');
+      }
+      
+      const schemaData = JSON.parse(schemaDataString);
+      
+      // Prepare the request payload
+      const payload = {
+        prompt: currentMessage,
+        tables: schemaData.tables,
+        userId: 'Supabasev2'
+      };
+      
+      console.log('Sending schema modification request:', payload);
+      
+      // Send the request to the API
+      const response = await fetch('http://localhost:3000/modify-schema', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('Received schema modification response:', responseData);
+      
+      if (!responseData.success) {
+        throw new Error('API returned unsuccessful response');
+      }
+      
+      // Preparing a specific response based on what changed
+      let responseMessage = "I've updated your schema based on your request.";
+      
+      // Compare original tables with updated tables to identify changes
+      if (schemaData.tables && responseData.tables) {
+        const changes = [];
+        
+        responseData.tables.forEach(newTable => {
+          const originalTable = schemaData.tables.find(t => t.name === newTable.name);
+          if (originalTable) {
+            newTable.columns.forEach(newCol => {
+              const originalCol = originalTable.columns.find(c => 
+                c.name === newCol.name.replace(/s$/, '') || c.name === newCol.name
+              );
+              
+              if (originalCol && originalCol.name !== newCol.name) {
+                changes.push(`Changed "${originalCol.name}" to "${newCol.name}" in ${newTable.name} table`);
+              }
+            });
+          }
+        });
+        
+        if (changes.length > 0) {
+          responseMessage += " Here's what changed:\n• " + changes.join("\n• ");
+        }
+      }
+      
+      // Add bot response to chat
+      const botResponse = { 
+        id: Date.now() + 1, 
+        text: responseMessage, 
+        sender: 'bot' 
+      };
+      
+      setChatMessages(prev => [...prev, botResponse]);
+      
+      // Set loading state to indicate schema update
+      setIsLoading(true);
+      
+      // Transform the API response to match our schema format
+      const transformedSchema = {
+        tables: responseData.tables.map(table => ({
+          name: table.name,
+          columns: table.columns.map(col => ({
+            name: col.name,
+            type: col.type,
+            isPrimary: Array.isArray(col.constraints) && col.constraints.includes('primary key'),
+            isForeign: Array.isArray(col.constraints) && col.constraints.some(c => c.includes('foreign key')),
+            constraints: col.constraints || []
+          }))
+        })),
+        relationships: []
+      };
+      
+      // Extract relationships
+      responseData.tables.forEach(table => {
+        if (table.relationships && Array.isArray(table.relationships)) {
+          table.relationships.forEach(rel => {
+            if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
+              transformedSchema.relationships.push({
+                source: table.name,
+                target: rel.targetTable,
+                type: rel.type,
+                sourceField: rel.sourceColumn,
+                targetField: rel.targetColumn
+              });
+            }
+          });
+        }
+      });
+      
+      // Update the schema in state
+      setSchema(transformedSchema);
+      
+      // Store updated schema back to sessionStorage in the expected format
+      const updatedSchemaData = {
+        tables: responseData.tables
+      };
+      
+      sessionStorage.setItem('schemaData', JSON.stringify(updatedSchemaData));
+      
+      // Mark that changes have been made
+      setHasChanges(true);
+      
+      // Finish loading
+      setIsLoading(false);
+      
+    } catch (error) {
+      console.error('Error processing schema modification:', error);
+      
+      // Add error message to chat
+      setChatMessages(prev => [
+        ...prev, 
+        { 
+          id: Date.now() + 1, 
+          text: `Sorry, there was an error: ${error.message}. Please try again or refine your request.`, 
+          sender: 'bot' 
+        }
+      ]);
+      
+      setIsLoading(false);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Toggle sidebar visibility
+  const toggleSidebar = () => {
+    setSidebarOpen(prev => !prev);
+  };
 
   return (
     <div 
@@ -315,50 +548,210 @@ const SchemaPage = () => {
               </span>
             </Button>
           </motion.div>
+          
+          {/* Chat sidebar toggle button */}
+          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <Button
+              variant="outline-primary"
+              onClick={toggleSidebar}
+              className="px-3 py-2 ms-2"
+              style={{ 
+                borderColor: 'rgba(59, 130, 246, 0.5)',
+                color: '#3b82f6'
+              }}
+            >
+              <span className="d-flex align-items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                {sidebarOpen ? 'Close Chat' : 'AI Assistant'}
+              </span>
+            </Button>
+          </motion.div>
         </div>
       </motion.header>
       
-      {/* Schema Visualization */}
+      {/* Schema Visualization with conditional width */}
       <main 
-        className="flex-grow-1 position-relative" 
+        className="flex-grow-1 position-relative d-flex" 
         style={{ 
           overflow: 'hidden',
           height: `${windowSize.height - 60}px` // Subtract header height
         }}
       >
-        {schema ? (
-          <motion.div 
-            className="h-100 w-100 position-absolute"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.3 }}
-          >
-            <SchemaFlow 
-              schema={schema} 
-              onModifyPrompt={handleModifyPrompt} 
-              onSchemaChange={handleSchemaChange}
-              key={`flow-${windowSize.width}-${windowSize.height}`} // Recreate on resize
-            />
-          </motion.div>
-        ) : !isLoading ? (
-          <div className="h-100 d-flex align-items-center justify-content-center">
-            <motion.p 
-              className="text-center p-4"
-              style={{ color: 'rgba(255, 255, 255, 0.6)' }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+        <div 
+          className="h-100 position-relative"
+          style={{ 
+            width: sidebarOpen ? 'calc(100% - 350px)' : '100%',
+            transition: 'width 0.3s ease-in-out'
+          }}
+        >
+          {schema ? (
+            <motion.div 
+              className="h-100 w-100 position-absolute"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 0.3 }}
             >
-              No schema available. Try generating one from the landing page.
-            </motion.p>
+              <SchemaFlow 
+                schema={schema} 
+                onModifyPrompt={handleModifyPrompt} 
+                onSchemaChange={handleSchemaChange}
+                key={`flow-${windowSize.width}-${windowSize.height}-${sidebarOpen ? 'sidebar' : 'nosidebar'}`} // Recreate on resize
+              />
+            </motion.div>
+          ) : !isLoading ? (
+            <div className="h-100 d-flex align-items-center justify-content-center">
+              <motion.p 
+                className="text-center p-4"
+                style={{ color: 'rgba(255, 255, 255, 0.6)' }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                No schema available. Try generating one from the landing page.
+              </motion.p>
+            </div>
+          ) : null}
+        </div>
+        
+        {/* Chat Sidebar */}
+        <motion.div 
+          className="h-100 d-flex flex-column"
+          style={{
+            width: '350px',
+            background: 'rgba(15, 23, 42, 0.8)',
+            backdropFilter: 'blur(10px)',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+            transform: sidebarOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-in-out',
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 10
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: sidebarOpen ? 1 : 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* Chat header */}
+          <div className="p-3 border-bottom" style={{ borderColor: 'rgba(255, 255, 255, 0.08) !important' }}>
+            <h3 className="fs-5 fw-bold text-white mb-0 d-flex align-items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2 text-primary">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Schema Assistant
+            </h3>
+            <p className="small mb-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              Ask me to modify your database schema
+            </p>
           </div>
-        ) : null}
+          
+          {/* Chat messages area */}
+          <div 
+            className="flex-grow-1 p-3 overflow-auto"
+            style={{ backgroundColor: 'rgba(15, 23, 42, 0.2)' }}
+          >
+            {chatMessages.length === 0 ? (
+              <div className="text-center mt-4" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1" className="mx-auto mb-3 text-primary opacity-75">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <p className="fs-6 mb-1">No messages yet</p>
+                <p className="small mb-0">
+                  Try asking me to modify your schema. For example:
+                </p>
+                <div className="mt-3 mb-2 text-start mx-auto" style={{ maxWidth: '280px' }}>
+                  <div className="small mb-2 rounded p-2 d-inline-block" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', maxWidth: '90%' }}>
+                    "Add a timestamp field to the Users table"
+                  </div>
+                  <div className="small mb-2 rounded p-2 d-inline-block" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', maxWidth: '90%' }}>
+                    "Create a new Products table with name, price, and description"
+                  </div>
+                  <div className="small mb-2 rounded p-2 d-inline-block" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', maxWidth: '90%' }}>
+                    "Add a one-to-many relationship between Users and Orders"
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {chatMessages.map(message => (
+                  <div 
+                    key={message.id} 
+                    className={`mb-3 d-flex ${message.sender === 'user' ? 'justify-content-end' : 'justify-content-start'}`}
+                  >
+                    <div 
+                      className="rounded p-3" 
+                      style={{
+                        backgroundColor: message.sender === 'user' 
+                          ? 'rgba(59, 130, 246, 0.8)' 
+                          : 'rgba(255, 255, 255, 0.1)',
+                        color: message.sender === 'user' 
+                          ? 'white' 
+                          : 'rgba(255, 255, 255, 0.9)',
+                        maxWidth: '80%',
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {message.text}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+          
+          {/* Chat input area */}
+          <div className="p-3 border-top" style={{ borderColor: 'rgba(255, 255, 255, 0.08) !important' }}>
+            <Form onSubmit={handleSendMessage}>
+              <div className="d-flex">
+                <Form.Control
+                  type="text"
+                  placeholder="Type your schema modification request..."
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  className="rounded-pill me-2"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: 'white'
+                  }}
+                  disabled={isSending}
+                />
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  className="rounded-circle d-flex justify-content-center align-items-center"
+                  style={{ 
+                    width: '40px', 
+                    height: '40px',
+                    background: 'linear-gradient(to right, #3b82f6, #2563eb)',
+                    border: 'none'
+                  }}
+                  disabled={isSending || !currentMessage.trim()}
+                >
+                  {isSending ? (
+                    <Spinner animation="border" size="sm" />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </Button>
+              </div>
+            </Form>
+            <div className="text-center mt-2">
+              <small style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                Your schema updates will be processed by our AI assistant
+              </small>
+            </div>
+          </div>
+        </motion.div>
       </main>
       
-      {/* Theme toggle with improved positioning */}
-      <div className="position-fixed" style={{ bottom: '24px', left: '24px', zIndex: 100 }}>
-        <ThemeToggle />
-      </div>
+
       
       {/* Loading overlay */}
       {isLoading && <LoadingAnimation />}
