@@ -668,14 +668,17 @@ const EndpointsPage = () => {
     // Clear any previous operation result
     setOperationResult({ show: false, success: false, message: '', data: null });
     
-    if (!selectedEndpoint || !selectedEndpoint.url) {
+    console.log('Selected endpoint:', selectedEndpoint);
+    
+    if (!selectedEndpoint || !selectedEndpoint.table) {
+      console.error('Invalid endpoint configuration:', selectedEndpoint);
       setSubmitError('Invalid endpoint configuration');
       setIsLoading(false);
       return;
     }
     
     try {
-      const resourceUrl = `${apiBaseUrl}/${userId}/${selectedEndpoint.table}`;
+      const resourceUrl = `${apiBaseUrl}/${selectedEndpoint.table}`;
       const requestUrl = modalMode === 'create' ? resourceUrl : `${resourceUrl}/${resourceId}`;
       
       console.log(`Submitting ${modalMode} request to:`, requestUrl);
@@ -693,11 +696,25 @@ const EndpointsPage = () => {
       switch (modalMode) {
         case 'create':
           requestConfig.method = 'POST';
-          requestConfig.body = JSON.stringify(formData);
+          // Make sure the formData has the userId included
+          {
+            const formDataWithUserId = { ...formData };
+            if (!formDataWithUserId.user_id && userId) {
+              formDataWithUserId.user_id = userId;
+            }
+            requestConfig.body = JSON.stringify(formDataWithUserId);
+          }
           break;
         case 'update':
           requestConfig.method = 'PUT';
-          requestConfig.body = JSON.stringify(formData);
+          // Make sure the formData has the userId included
+          {
+            const formDataWithUserId = { ...formData };
+            if (!formDataWithUserId.user_id && userId) {
+              formDataWithUserId.user_id = userId;
+            }
+            requestConfig.body = JSON.stringify(formDataWithUserId);
+          }
           break;
         case 'delete':
           requestConfig.method = 'DELETE';
@@ -711,7 +728,7 @@ const EndpointsPage = () => {
         method: requestConfig.method,
         url: requestUrl,
         headers: requestConfig.headers,
-        bodyPreview: requestConfig.body ? JSON.stringify(formData).substring(0, 200) + '...' : 'No body'
+        bodyPreview: requestConfig.body ? requestConfig.body.substring(0, 200) + '...' : 'No body'
       });
       
       const response = await fetch(requestUrl, requestConfig);
@@ -835,7 +852,7 @@ const EndpointsPage = () => {
     // First try to get schema from existing data
     try {
       // Build the URL for fetching table data
-      const url = `${apiBaseUrl}/${userId}/${tableName}?limit=1`;
+      const url = `${apiBaseUrl}/${tableName}?limit=1`;
       console.log(`Making schema discovery request to: ${url}`);
       
       const response = await fetch(url);
@@ -1543,9 +1560,9 @@ const EndpointsPage = () => {
         size="lg"
         aria-labelledby="crud-modal"
         centered
-        className="crud-modal"
+        className="crud-modal dark-modal"
       >
-        <Modal.Header closeButton className="border-bottom">
+        <Modal.Header closeButton className="border-bottom bg-dark text-white">
           <Modal.Title id="crud-modal">
             {modalMode === 'create' && <><i className="bi bi-plus-circle me-2"></i>Create {selectedEndpoint?.name || 'Record'}</>}
             {modalMode === 'read' && <><i className="bi bi-eye me-2"></i>View {selectedEndpoint?.name || 'Record'}</>}
@@ -1553,11 +1570,11 @@ const EndpointsPage = () => {
             {modalMode === 'delete' && <><i className="bi bi-trash me-2"></i>Delete {selectedEndpoint?.name || 'Record'}</>}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body className="py-4">
+        <Modal.Body className="py-4 bg-dark text-white">
           {isLoading ? (
             <div className="text-center py-5">
               <Spinner animation="border" variant="primary" className="mb-3" />
-              <p className="text-muted mb-0">Loading...</p>
+              <p className="text-light mb-0">Loading...</p>
             </div>
           ) : (
             <>
@@ -1589,15 +1606,15 @@ const EndpointsPage = () => {
               {modalMode === 'delete' ? (
                 <div className="text-center py-3">
                   <div className="mb-4">
-                    <span className="delete-icon-wrapper">
+                    <span className="delete-icon-wrapper text-danger">
                       <i className="bi bi-exclamation-triangle"></i>
                     </span>
                   </div>
-                  <h5 className="mb-3">Are you sure you want to delete this {selectedEndpoint?.name}?</h5>
-                  <p className="text-muted mb-4">This action cannot be undone.</p>
+                  <h5 className="mb-3 text-white">Are you sure you want to delete this {selectedEndpoint?.name}?</h5>
+                  <p className="text-light mb-4">This action cannot be undone.</p>
                   <div className="d-flex justify-content-center">
                     <Button
-                      variant="outline-secondary"
+                      variant="outline-light"
                       onClick={handleCloseModal}
                       className="me-3"
                       disabled={isLoading}
@@ -1624,14 +1641,14 @@ const EndpointsPage = () => {
                 <Form onSubmit={handleSubmit}>
                   {Object.entries(formData).map(([key, value]) => (
                     <Form.Group key={key} className="mb-3">
-                      <Form.Label className="text-capitalize">{formatFieldName(key)}</Form.Label>
+                      <Form.Label className="text-capitalize text-light">{formatFieldName(key)}</Form.Label>
                       {key === 'id' || key === 'user_id' || key.includes('_id') ? (
                         <Form.Control
                           type="text"
                           value={value}
                           onChange={(e) => handleFormChange(key, e.target.value)}
                           disabled={modalMode === 'read' || key === 'id' || (key === 'user_id' && modalMode !== 'update')}
-                          className="border"
+                          className="border bg-dark text-white"
                         />
                       ) : getFieldType(key, value) === 'date' ? (
                         <Form.Control
@@ -1639,7 +1656,7 @@ const EndpointsPage = () => {
                           value={value && value.includes('T') ? value.split('T')[0] : value}
                           onChange={(e) => handleFormChange(key, e.target.value)}
                           disabled={modalMode === 'read'}
-                          className="border"
+                          className="border bg-dark text-white"
                         />
                       ) : getFieldType(key, value) === 'boolean' ? (
                         <Form.Check
@@ -1648,7 +1665,7 @@ const EndpointsPage = () => {
                           onChange={(e) => handleFormChange(key, e.target.checked)}
                           disabled={modalMode === 'read'}
                           label={value === true ? 'Yes' : 'No'}
-                          className="ms-2"
+                          className="ms-2 text-light"
                         />
                       ) : getFieldType(key, value) === 'longtext' ? (
                         <Form.Control
@@ -1657,7 +1674,7 @@ const EndpointsPage = () => {
                           value={value || ''}
                           onChange={(e) => handleFormChange(key, e.target.value)}
                           disabled={modalMode === 'read'}
-                          className="border"
+                          className="border bg-dark text-white"
                         />
                       ) : getFieldType(key, value) === 'timestamp' ? (
                         <Form.Control
@@ -1665,7 +1682,7 @@ const EndpointsPage = () => {
                           value={formatDateTimeForInput(value)}
                           onChange={(e) => handleFormChange(key, e.target.value)}
                           disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
-                          className="border"
+                          className="border bg-dark text-white"
                         />
                       ) : (
                         <Form.Control
@@ -1673,11 +1690,11 @@ const EndpointsPage = () => {
                           value={value !== null && value !== undefined ? value : ''}
                           onChange={(e) => handleFormChange(key, e.target.value)}
                           disabled={modalMode === 'read'}
-                          className="border"
+                          className="border bg-dark text-white"
                         />
                       )}
                       {getFieldNote(key) && (
-                        <Form.Text className="text-muted">
+                        <Form.Text className="text-light opacity-75">
                           {getFieldNote(key)}
                         </Form.Text>
                       )}
@@ -1687,7 +1704,7 @@ const EndpointsPage = () => {
                   {modalMode !== 'read' && (
                     <div className="d-flex justify-content-end mt-4">
                       <Button
-                        variant="outline-secondary"
+                        variant="outline-light"
                         onClick={handleCloseModal}
                         className="me-2"
                         disabled={isLoading}
@@ -1767,6 +1784,33 @@ const EndpointsPage = () => {
         
         ::-webkit-scrollbar-thumb:hover {
           background: rgba(59, 130, 246, 0.7);
+        }
+        
+        /* Dark modal styles */
+        .dark-modal .modal-content {
+          background-color: #1e293b;
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .dark-modal .close {
+          color: white;
+        }
+        
+        .dark-modal .form-control:disabled {
+          background-color: #151e2d;
+          color: rgba(255, 255, 255, 0.6);
+        }
+        
+        /* Fix date picker text color */
+        .dark-modal input[type="date"],
+        .dark-modal input[type="datetime-local"] {
+          color-scheme: dark;
+        }
+        
+        /* Modal close button color fix */
+        .dark-modal .btn-close {
+          filter: invert(1) grayscale(100%) brightness(200%);
         }
       `}</style>
     </div>
