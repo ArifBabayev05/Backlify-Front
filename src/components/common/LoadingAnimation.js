@@ -19,10 +19,11 @@ const LoadingAnimation = () => {
       setLoadingPhase(prev => (prev + 1) % phases.length);
     }, 3000);
     
-    // Update progress bar
+    // Update progress bar, but cap at 90% to show it's still loading
+    // Will disappear when parent component removes the loading animation
     const progressInterval = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 100) return 100;
+        if (prev >= 90) return 90; // Cap at 90% instead of 100%
         return prev + 1;
       });
     }, 150);

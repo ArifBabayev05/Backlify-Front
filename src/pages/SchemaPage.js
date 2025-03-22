@@ -11,6 +11,7 @@ import LoadingAnimation from '../components/common/LoadingAnimation';
 const SchemaPage = () => {
   const [schema, setSchema] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [apiDataReceived, setApiDataReceived] = useState(false);
   const [userPrompt, setUserPrompt] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const navigate = useNavigate();
@@ -41,78 +42,118 @@ const SchemaPage = () => {
       setUserPrompt(storedPrompt);
     }
     
-    // Keep loading state true until we successfully process schema data
+    // Set loading state to true at the beginning
     setIsLoading(true);
     
-    // Get schema data from sessionStorage
-    const schemaDataString = sessionStorage.getItem('schemaData');
-    console.log('Raw schemaData from sessionStorage:', schemaDataString);
+    // Check if dataReady flag exists
+    const checkDataReady = () => {
+      const dataReady = sessionStorage.getItem('dataReady');
+      return dataReady === 'true';
+    };
     
-    if (schemaDataString) {
-      try {
-        const schemaData = JSON.parse(schemaDataString);
-        console.log('Parsed schemaData:', schemaData);
-        
-        // Transform the API response format to match the expected schema format
-        if (schemaData && schemaData.tables && Array.isArray(schemaData.tables)) {
-          console.log('Found tables array with length:', schemaData.tables.length);
+    // Function to process schema data
+    const processSchemaData = () => {
+      // Get schema data from sessionStorage
+      const schemaDataString = sessionStorage.getItem('schemaData');
+      console.log('Raw schemaData from sessionStorage:', schemaDataString);
+      
+      if (schemaDataString) {
+        try {
+          const schemaData = JSON.parse(schemaDataString);
+          console.log('Parsed schemaData:', schemaData);
           
-          const transformedSchema = {
-            tables: schemaData.tables.map(table => {
-              console.log('Processing table:', table.name);
-              return {
-                name: table.name,
-                columns: Array.isArray(table.columns) ? table.columns.map(col => ({
-                  name: col.name,
-                  type: col.type,
-                  isPrimary: Array.isArray(col.constraints) && col.constraints.includes('primary key'),
-                  isForeign: Array.isArray(col.constraints) && col.constraints.some(c => c.includes('foreign key')),
-                  constraints: col.constraints || []
-                })) : []
-              };
-            }),
-            relationships: []
-          };
-          
-          // Extract relationships from tables
-          schemaData.tables.forEach(table => {
-            if (table.relationships && Array.isArray(table.relationships)) {
-              console.log(`Processing ${table.relationships.length} relationships for table ${table.name}`);
-              table.relationships.forEach(rel => {
-                // Check that all required fields are present
-                if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
-                  transformedSchema.relationships.push({
-                    source: table.name,
-                    target: rel.targetTable,
-                    type: rel.type,
-                    sourceField: rel.sourceColumn,
-                    targetField: rel.targetColumn
-                  });
-                } else {
-                  console.warn('Skipping incomplete relationship:', rel);
-                }
-              });
-            }
-          });
-          
-          console.log('Transformed schema:', transformedSchema);
-          setSchema(transformedSchema);
-          
-          // Only stop loading when schema is successfully loaded
+          // Transform the API response format to match the expected schema format
+          if (schemaData && schemaData.tables && Array.isArray(schemaData.tables)) {
+            console.log('Found tables array with length:', schemaData.tables.length);
+            
+            const transformedSchema = {
+              tables: schemaData.tables.map(table => {
+                console.log('Processing table:', table.name);
+                return {
+                  name: table.name,
+                  columns: Array.isArray(table.columns) ? table.columns.map(col => ({
+                    name: col.name,
+                    type: col.type,
+                    isPrimary: Array.isArray(col.constraints) && col.constraints.includes('primary key'),
+                    isForeign: Array.isArray(col.constraints) && col.constraints.some(c => c.includes('foreign key')),
+                    constraints: col.constraints || []
+                  })) : []
+                };
+              }),
+              relationships: []
+            };
+            
+            // Extract relationships from tables
+            schemaData.tables.forEach(table => {
+              if (table.relationships && Array.isArray(table.relationships)) {
+                console.log(`Processing ${table.relationships.length} relationships for table ${table.name}`);
+                table.relationships.forEach(rel => {
+                  // Check that all required fields are present
+                  if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
+                    transformedSchema.relationships.push({
+                      source: table.name,
+                      target: rel.targetTable,
+                      type: rel.type,
+                      sourceField: rel.sourceColumn,
+                      targetField: rel.targetColumn
+                    });
+                  } else {
+                    console.warn('Skipping incomplete relationship:', rel);
+                  }
+                });
+              }
+            });
+            
+            console.log('Transformed schema:', transformedSchema);
+            setSchema(transformedSchema);
+            setApiDataReceived(true);
+            
+            // Only stop loading when schema is successfully processed
+            setIsLoading(false);
+          } else {
+            console.error('Invalid schema data structure - missing tables array:', schemaData);
+            // Still set apiDataReceived to true since we did get a response
+            setApiDataReceived(true);
+            setIsLoading(false);
+          }
+        } catch (error) {
+          console.error('Error parsing schema data:', error);
+          setApiDataReceived(true);
           setIsLoading(false);
-        } else {
-          console.error('Invalid schema data structure - missing tables array:', schemaData);
-          setIsLoading(false); // Still need to stop loading on error
         }
-      } catch (error) {
-        console.error('Error parsing schema data:', error);
-        setIsLoading(false); // Still need to stop loading on error
+      } else if (apiDataReceived) {
+        // If we previously received API data but now it's gone
+        console.warn('No schema data found in sessionStorage, but API data was previously received');
+        setIsLoading(false);
       }
+    };
+    
+    // Initial processing attempt
+    if (checkDataReady()) {
+      processSchemaData();
     } else {
-      console.warn('No schema data found in sessionStorage');
-      setIsLoading(false); // Stop loading if no data is found
+      // Set up an interval to check for data readiness
+      const intervalId = setInterval(() => {
+        if (checkDataReady()) {
+          clearInterval(intervalId);
+          processSchemaData();
+        }
+      }, 500); // Check every 500ms
+      
+      // Safety timeout to prevent waiting forever
+      const timeoutId = setTimeout(() => {
+        clearInterval(intervalId);
+        setApiDataReceived(true);
+        setIsLoading(false);
+        console.warn('Timed out waiting for schema data');
+      }, 15000); // 15 second timeout
+      
+      return () => {
+        clearInterval(intervalId);
+        clearTimeout(timeoutId);
+      };
     }
-  }, []);
+  }, [apiDataReceived]);
 
   // Handle schema changes from SchemaFlow component
   const handleSchemaChange = useCallback((updatedNodes, updatedEdges) => {
@@ -181,12 +222,29 @@ const SchemaPage = () => {
 
   const handleModifyPrompt = (promptUpdate) => {
     setIsLoading(true);
+    setApiDataReceived(false);
     
     // In a real app, we'd call the API with the updated prompt
     // For now, we'll simulate updating the schema after a delay
     setTimeout(() => {
-      // For the demo, we're not actually changing the schema
-      setIsLoading(false);
+      // Process the schema data again once API responds
+      const schemaDataString = sessionStorage.getItem('schemaData');
+      if (schemaDataString) {
+        try {
+          const schemaData = JSON.parse(schemaDataString);
+          if (schemaData && schemaData.tables) {
+            setApiDataReceived(true);
+            setIsLoading(false);
+          }
+        } catch (error) {
+          console.error('Error processing modified schema:', error);
+          setApiDataReceived(true);
+          setIsLoading(false);
+        }
+      } else {
+        setApiDataReceived(true);
+        setIsLoading(false);
+      }
     }, 3000);
   };
 
@@ -194,6 +252,7 @@ const SchemaPage = () => {
     try {
       // Show loading animation
       setIsLoading(true);
+      setApiDataReceived(false);
       
       // Get current schema data from sessionStorage
       const schemaDataString = sessionStorage.getItem('schemaData');
@@ -235,6 +294,8 @@ const SchemaPage = () => {
       sessionStorage.setItem('apiEndpoints', JSON.stringify(responseData));
       
       // Navigate to endpoints page with the API data
+      setApiDataReceived(true);
+      setIsLoading(false);
       navigate('/endpoints');
       
     } catch (error) {
@@ -244,7 +305,8 @@ const SchemaPage = () => {
       alert(`Failed to generate API endpoints: ${error.message}`);
       
     } finally {
-      // Hide loading animation
+      // Hide loading animation and mark data as received regardless of outcome
+      setApiDataReceived(true);
       setIsLoading(false);
     }
   };
@@ -317,6 +379,10 @@ const SchemaPage = () => {
       
       console.log('Sending schema modification request:', payload);
       
+      // Set loading state before API call
+      setIsLoading(true);
+      setApiDataReceived(false);
+      
       // Send the request to the API
       const response = await fetch('http://localhost:3000/modify-schema', {
         method: 'POST',
@@ -373,8 +439,8 @@ const SchemaPage = () => {
       
       setChatMessages(prev => [...prev, botResponse]);
       
-      // Set loading state to indicate schema update
-      setIsLoading(true);
+      // Mark data as received before processing
+      setApiDataReceived(true);
       
       // Transform the API response to match our schema format
       const transformedSchema = {
@@ -437,6 +503,8 @@ const SchemaPage = () => {
         }
       ]);
       
+      // Make sure we mark data as received and stop loading on error
+      setApiDataReceived(true);
       setIsLoading(false);
     } finally {
       setIsSending(false);
@@ -586,7 +654,7 @@ const SchemaPage = () => {
             transition: 'width 0.3s ease-in-out'
           }}
         >
-          {schema ? (
+          {schema && !isLoading ? (
             <motion.div 
               className="h-100 w-100 position-absolute"
               initial={{ opacity: 0 }}
@@ -600,7 +668,7 @@ const SchemaPage = () => {
                 key={`flow-${windowSize.width}-${windowSize.height}-${sidebarOpen ? 'sidebar' : 'nosidebar'}`} // Recreate on resize
               />
             </motion.div>
-          ) : !isLoading ? (
+          ) : !isLoading && apiDataReceived ? (
             <div className="h-100 d-flex align-items-center justify-content-center">
               <motion.p 
                 className="text-center p-4"
