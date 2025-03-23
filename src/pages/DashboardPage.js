@@ -40,14 +40,14 @@ const DashboardPage = () => {
       setLoading(true);
       setError(null);
       
-      const userId = user?.userId;
-      console.log(`Fetching APIs for user: ${userId}`);
+      const XAuthUserId = user?.XAuthUserId;
+      console.log(`Fetching APIs for user: ${XAuthUserId}`);
       
       const response = await fetch('http://localhost:3000/my-apis', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': userId
+          'X-User-Id': XAuthUserId
         }
       });
 

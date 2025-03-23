@@ -8,11 +8,11 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize user state from localStorage on app load
   useEffect(() => {
-    const userId = localStorage.getItem('userId');
+    const XAuthUserId = localStorage.getItem('XAuthUserId');
     const email = localStorage.getItem('email');
     
-    if (userId && email) {
-      setUser({ userId, email });
+    if (XAuthUserId && email) {
+      setUser({ XAuthUserId, email });
     }
     
     setLoading(false);
@@ -21,14 +21,14 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = (userData) => {
     setUser(userData);
-    localStorage.setItem('userId', userData.userId);
+    localStorage.setItem('XAuthUserId', userData.XAuthUserId);
     localStorage.setItem('email', userData.email);
   };
 
   // Logout function
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('userId');
+    localStorage.removeItem('XAuthUserId');
     localStorage.removeItem('email');
   };
 

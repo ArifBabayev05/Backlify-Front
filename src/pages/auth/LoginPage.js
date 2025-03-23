@@ -71,7 +71,7 @@ const LoginPage = () => {
 
       // Store user data using auth context
       login({
-        userId: data.userId,
+        XAuthUserId: data.XAuthUserId,
         email: data.email
       });
 

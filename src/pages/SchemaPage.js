@@ -305,12 +305,12 @@ const SchemaPage = () => {
       const schemaData = JSON.parse(schemaDataString);
       console.log('Schema data for API generation:', schemaData);
       
-      // Make sure we have a userId
-      const userId = schemaData.userId || 'default';
+      // Make sure we have a XAuthUserId
+      const XAuthUserId = schemaData.XAuthUserId || 'default';
       
       const payload = {
         tables: schemaData.tables,
-        userId: userId
+        XAuthUserId: XAuthUserId
       };
       
       console.log('Sending API generation request:', payload);
@@ -320,7 +320,7 @@ const SchemaPage = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': payload.userId
+          'X-User-Id': payload.XAuthUserId
         },
         body: JSON.stringify(payload)
       });
@@ -336,13 +336,15 @@ const SchemaPage = () => {
         throw new Error('API generation was unsuccessful');
       }
       
-      // 6. Create a more complete response for endpoint page by merging response data with local schema data
-      const enhancedResponse = {
-        ...responseData
-      };
+      // 6. Store the complete API response in sessionStorage without any transformation
+      // This is important - we want to preserve ALL schema information from the server
+      sessionStorage.setItem('apiEndpoints', JSON.stringify(responseData));
       
-      // 7. Store the enhanced API response in sessionStorage
-      sessionStorage.setItem('apiEndpoints', JSON.stringify(enhancedResponse));
+      // 7. Store the complete table definitions in a separate key for easy access
+      if (responseData.tables && Array.isArray(responseData.tables)) {
+        console.log('Storing complete table definitions:', responseData.tables);
+        sessionStorage.setItem('tableDefinitions', JSON.stringify(responseData.tables));
+      }
       
       // 8. Also store the API ID in localStorage for the dashboard to access
       if (responseData.apiId) {
@@ -457,7 +459,7 @@ const SchemaPage = () => {
       const payload = {
         prompt: currentMessage,
         tables: schemaData.tables,
-        userId: 'User'
+        XAuthUserId: 'User'
       };
       
       console.log('Sending schema modification request:', payload);

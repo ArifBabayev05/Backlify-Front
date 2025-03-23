@@ -38,7 +38,7 @@ const EndpointsPage = () => {
   const [endpoints, setEndpoints] = useState([]);
   const [apiBaseUrl, setApiBaseUrl] = useState('');
   const [apiId, setApiId] = useState('');
-  const [userId, setUserId] = useState('');
+  const [XAuthUserId, setUserId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true); // For the full-page loading animation
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -135,7 +135,7 @@ const EndpointsPage = () => {
   const getFieldNote = (key) => {
     const notesMap = {
       'id': 'Unique identifier (auto-generated)',
-      'user_id': 'User identifier for ownership',
+      'XAuthUserId': 'User identifier for ownership',
       'created_at': 'Creation timestamp (auto-generated)',
       'updated_at': 'Last update timestamp (auto-updated)',
       'email': 'Must be a valid email address',
@@ -192,7 +192,7 @@ const EndpointsPage = () => {
     
     // Common fields mapping for fallback
     const commonRelationships = {
-      'user_id': 'users',
+      'XAuthUserId': 'users',
       'author_id': 'users',
       'creator_id': 'users',
       'owner_id': 'users',
@@ -207,33 +207,19 @@ const EndpointsPage = () => {
       'parent_id': key.replace('_id', 's'), // parent_id → parents
     };
     
-    // Check our common mappings
+    // Return the common relationship if one exists
     if (commonRelationships[key]) {
-      console.log(`Using common relationship mapping for ${key} -> ${commonRelationships[key]}`);
+      console.log(`Using common relationship for ${key} -> ${commonRelationships[key]}`);
       return commonRelationships[key];
     }
     
-    // Check for field naming pattern like 'product_id', 'category_id', etc.
+    // If no matches found, try to infer from the key name
     if (key.endsWith('_id')) {
-      // Extract the table name from the field - convert to plural if needed
-      let tableName = key.replace('_id', '');
-      
-      // Check common singular/plural patterns
-      if (!tableName.endsWith('s') && tableName.length > 1) {
-        // Most tables are named in plural form, but don't pluralize single letters
-        tableName = tableName + 's';
-      }
-      
-      // Check if this table exists in our endpoints list
-      const tableExists = endpoints.some(endpoint => endpoint.table === tableName);
-      
-      if (tableExists) {
-        console.log(`Inferred relationship from field name for ${key} -> ${tableName}`);
-        return tableName;
-      }
+      const tableName = key.replace('_id', 's');
+      console.log(`Inferring table name from key: ${key} -> ${tableName}`);
+      return tableName;
     }
     
-    console.log(`Could not determine relationship for ${key}`);
     return null;
   };
   
@@ -440,6 +426,9 @@ const EndpointsPage = () => {
       // Initialize the API base URL
       setApiBaseUrl(`http://localhost:3000/api/${selectedApiId}`);
       loadApiEndpoints(selectedApiId);
+      
+      // Load users data for relationship fields
+      loadUsersData();
     } else {
       // No data and not loading - redirect to dashboard
       console.log('No API ID or session data, redirecting to dashboard');
@@ -455,22 +444,22 @@ const EndpointsPage = () => {
     
     try {
       // Fetch the user's ID from sessionStorage first, then fallback to localStorage
-      const userIdFromSession = sessionStorage.getItem('userId');
-      const userId = userIdFromSession || localStorage.getItem('userId');
+      const userIdFromSession = sessionStorage.getItem('XAuthUserId');
+      const XAuthUserId = userIdFromSession || localStorage.getItem('XAuthUserId');
       
-      if (!userId) {
+      if (!XAuthUserId) {
         throw new Error('User not authenticated');
       }
       
-      // Update the userId state
-      setUserId(userId);
+      // Update the XAuthUserId state
+      setUserId(XAuthUserId);
       
       // Make a request to your backend to get the API details
       const response = await fetch('http://localhost:3000/my-apis', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': userId
+          'X-User-Id': XAuthUserId
         }
       });
       
@@ -600,8 +589,13 @@ const EndpointsPage = () => {
         console.warn('No API ID found in endpoint data');
       }
       
-      // Store the complete schema information if available
-      if (endpointsData.tables) {
+      // Get table definitions from the API response
+      if (endpointsData.tables && Array.isArray(endpointsData.tables)) {
+        // Also store in session storage for other components to access
+        sessionStorage.setItem('tableDefinitions', JSON.stringify(endpointsData.tables));
+        console.log('Stored table definitions in session storage:', endpointsData.tables);
+        
+        // Store the complete schema information in state
         setCompleteSchemaInfo(endpointsData.tables);
         console.log('Loaded complete schema information:', endpointsData.tables);
         
@@ -613,8 +607,23 @@ const EndpointsPage = () => {
             table.columns.forEach(column => {
               const isRequired = column.constraints?.includes('not null');
               const isPrimary = column.constraints?.includes('primary key');
+              
+              // Determine the type based on database column type
+              let fieldType = 'string';
+              if (column.type === 'uuid' || column.type.includes('int') || column.name.endsWith('_id')) {
+                fieldType = 'id';
+              } else if (column.type === 'timestamp' || column.type === 'timestamptz' || column.type === 'date') {
+                fieldType = 'timestamp';
+              } else if (column.type === 'boolean') {
+                fieldType = 'boolean';
+              } else if (column.type === 'numeric' || column.type === 'decimal' || column.type === 'float') {
+                fieldType = 'number';
+              } else if (column.type === 'text' || column.type.includes('text')) {
+                fieldType = 'longtext';
+              }
+              
               schema[column.name] = { 
-                type: column.type, 
+                type: fieldType, 
                 required: isRequired,
                 primary: isPrimary,
                 constraints: column.constraints || []
@@ -623,6 +632,9 @@ const EndpointsPage = () => {
           }
           schemas[table.name] = schema;
         });
+        
+        // Store the schemas in state for form generation
+        console.log('Generated table schemas from API definition:', schemas);
         setTableSchemas(schemas);
         
         // Create basic endpoints if they don't exist in the response
@@ -643,8 +655,8 @@ const EndpointsPage = () => {
       }
       
       // Set user ID if available
-      if (endpointsData.userId) {
-        setUserId(endpointsData.userId);
+      if (endpointsData.XAuthUserId) {
+        setUserId(endpointsData.XAuthUserId);
       }
       
       // Set swagger URL if available
@@ -985,7 +997,12 @@ const EndpointsPage = () => {
       console.log(`Required fields for ${endpoint.table}:`, requiredFields);
       
       // Get user ID from sessionStorage
-      const userIdFromSession = sessionStorage.getItem('userId') || userId;
+      const userIdFromSession = sessionStorage.getItem('XAuthUserId') || XAuthUserId;
+      
+      // Special handling for admin table - ensure users data is loaded
+      if (endpoint.table === 'admin') {
+        await loadUsersData();
+      }
       
       // Identify all potential foreign key fields (ending with _id)
       const allPotentialForeignKeys = [];
@@ -1039,6 +1056,12 @@ const EndpointsPage = () => {
             console.log(`Added foreign key from record: ${key}`);
           }
         });
+      }
+      
+      // Always add XAuthUserId as a potential foreign key for admin table
+      if (endpoint.table === 'admin' && !allPotentialForeignKeys.includes('XAuthUserId')) {
+        allPotentialForeignKeys.push('XAuthUserId');
+        console.log('Added XAuthUserId as foreign key for admin table');
       }
       
       console.log(`Identified potential foreign key fields for ${endpoint.table}:`, allPotentialForeignKeys);
@@ -1099,11 +1122,11 @@ const EndpointsPage = () => {
                 return;
               }
               
-              // Skip user_id field for doctors table (unless it's a relationship field)
-              if (endpoint.table === 'doctors' && column.name === 'user_id') {
+              // Skip XAuthUserId field for doctors table (unless it's a relationship field)
+              if (endpoint.table === 'doctors' && column.name === 'XAuthUserId') {
                 // Check if it's a relationship field
                 const isRelationshipField = tableSchema.relationships?.some(rel => 
-                  rel.sourceColumn === 'user_id' || rel.targetColumn === 'user_id'
+                  rel.sourceColumn === 'XAuthUserId' || rel.targetColumn === 'XAuthUserId'
                 );
                 
                 if (!isRelationshipField) {
@@ -1210,7 +1233,7 @@ const EndpointsPage = () => {
         
         console.log('Final form data for create:', initialFormData);
         
-        // Ensure user_id is set correctly
+        // Ensure XAuthUserId is set correctly
         initialFormData = ensureUserIdInFormData(initialFormData);
         
         // Apply special handling for doctors table
@@ -1223,7 +1246,7 @@ const EndpointsPage = () => {
         if (record) {
           console.log(`Setting form data for ${mode} operation:`, record);
           
-          // Make a copy of the record and ensure user_id is set correctly
+          // Make a copy of the record and ensure XAuthUserId is set correctly
           let updatedRecord = ensureUserIdInFormData({ ...record });
           
           // Apply special handling for doctors table
@@ -1305,13 +1328,13 @@ const EndpointsPage = () => {
     return 'text';
   };
 
-  // Add a function to ensure user_id is set correctly in form data
+  // Add a function to ensure XAuthUserId is set correctly in form data
   const ensureUserIdInFormData = (data) => {
-    const userIdFromSession = sessionStorage.getItem('userId');
-    const currentUserId = userIdFromSession || userId;
+    const userIdFromSession = sessionStorage.getItem('XAuthUserId');
+    const currentUserId = userIdFromSession || XAuthUserId;
     
-    if (!data.user_id && currentUserId) {
-      return { ...data, user_id: currentUserId };
+    if (!data.XAuthUserId && currentUserId) {
+      return { ...data, XAuthUserId: currentUserId };
     }
     
     return data;
@@ -1341,7 +1364,7 @@ const EndpointsPage = () => {
       console.log(`Submitting ${modalMode} request to:`, requestUrl);
       
       // Get the latest user ID from sessionStorage
-      const userIdFromSession = sessionStorage.getItem('userId') || userId;
+      const userIdFromSession = sessionStorage.getItem('XAuthUserId') || XAuthUserId;
       
       // Configure the request based on the operation
       let requestConfig = {
@@ -1355,7 +1378,7 @@ const EndpointsPage = () => {
       switch (modalMode) {
         case 'create':
           requestConfig.method = 'POST';
-          // Make sure the formData has the userId included
+          // Make sure the formData has the XAuthUserId included
           {
             const formDataWithUserId = ensureUserIdInFormData(formData);
             requestConfig.body = JSON.stringify(formDataWithUserId);
@@ -1363,7 +1386,7 @@ const EndpointsPage = () => {
           break;
         case 'update':
           requestConfig.method = 'PUT';
-          // Make sure the formData has the userId included
+          // Make sure the formData has the XAuthUserId included
           {
             const formDataWithUserId = ensureUserIdInFormData(formData);
             requestConfig.body = JSON.stringify(formDataWithUserId);
@@ -1499,6 +1522,29 @@ const EndpointsPage = () => {
       return null;
     }
     
+    // First, check if we already have this table schema in our state
+    if (tableSchemas[tableName]) {
+      console.log(`Using existing schema for ${tableName}:`, tableSchemas[tableName]);
+      return tableSchemas[tableName];
+    }
+    
+    // If not in state, check if we have the table definition from the API response
+    try {
+      const tableDefinitionsString = sessionStorage.getItem('tableDefinitions');
+      if (tableDefinitionsString) {
+        const tableDefinitions = JSON.parse(tableDefinitionsString);
+        const tableDefinition = tableDefinitions.find(t => t.name === tableName);
+        
+        if (tableDefinition && tableDefinition.columns) {
+          console.log(`Using table definition from API response for ${tableName}:`, tableDefinition);
+          return inferDefaultSchema(tableName); // This will now use the table definition
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for table definition:', error);
+    }
+    
+    // If we don't have definitions, try to get them from the API
     if (!apiBaseUrl && apiId) {
       // If apiBaseUrl is not set but we have apiId, set it
       const newApiBaseUrl = `http://localhost:3000/api/${apiId}`;
@@ -1520,23 +1566,25 @@ const EndpointsPage = () => {
     setIsLoading(true);
     
     try {
+      // Test if the API endpoint is ready
+      const isApiReady = await checkApiReady(url);
+      
+      if (!isApiReady) {
+        console.warn(`API endpoint not ready yet for ${tableName}, using default schema`);
+        return inferDefaultSchema(tableName);
+      }
+      
+      // Make the request to get data
       const response = await fetch(url);
-      
-      // First read the response as text
       const responseText = await response.text();
-      let data = null;
       
+      let data;
       try {
-        // Try to parse as JSON if there is content
-        if (responseText && responseText.trim() !== '') {
-          data = JSON.parse(responseText);
-          console.log(`Received data for schema discovery:`, data);
-        } else {
-          console.warn(`Empty response received when trying to discover schema for ${tableName}`);
-        }
-      } catch (parseError) {
-        console.error(`Error parsing JSON response for schema discovery:`, parseError);
-        console.log(`Raw response:`, responseText);
+        data = JSON.parse(responseText);
+        console.log(`Received schema data for ${tableName}:`, data);
+      } catch (error) {
+        console.error('Error parsing response:', error, 'Raw response:', responseText);
+        return inferDefaultSchema(tableName);
       }
       
       if (!response.ok) {
@@ -1629,12 +1677,75 @@ const EndpointsPage = () => {
     return schema;
   };
   
-  // Helper function to create a default schema based on common table patterns
+  // Helper function to create a default schema based on common table patterns or API response data
   const inferDefaultSchema = (tableName) => {
     console.log(`Creating default schema for ${tableName}`);
+    
+    // First, check if we have the table definition from the API response
+    let tableDefinitions = null;
+    try {
+      const tableDefinitionsString = sessionStorage.getItem('tableDefinitions');
+      if (tableDefinitionsString) {
+        tableDefinitions = JSON.parse(tableDefinitionsString);
+        console.log('Found table definitions in session storage:', tableDefinitions);
+      }
+    } catch (error) {
+      console.error('Error parsing table definitions from session storage:', error);
+    }
+    
+    // Try to find the definition for the current table
+    if (tableDefinitions && Array.isArray(tableDefinitions)) {
+      const tableDefinition = tableDefinitions.find(t => t.name === tableName);
+      
+      if (tableDefinition && tableDefinition.columns) {
+        console.log(`Found table definition for ${tableName} in API response:`, tableDefinition);
+        
+        // Create schema based on the actual table definition
+        const schema = {};
+        
+        tableDefinition.columns.forEach(column => {
+          const isRequired = column.constraints?.includes('not null');
+          const isPrimary = column.constraints?.includes('primary key');
+          
+          // Determine the type based on database column type
+          let fieldType = 'string';
+          if (column.type === 'uuid' || column.type.includes('int') || column.name.endsWith('_id')) {
+            fieldType = 'id';
+          } else if (column.type === 'timestamp' || column.type === 'timestamptz' || column.type === 'date') {
+            fieldType = 'timestamp';
+          } else if (column.type === 'boolean') {
+            fieldType = 'boolean';
+          } else if (column.type === 'numeric' || column.type === 'decimal' || column.type === 'float') {
+            fieldType = 'number';
+          } else if (column.type === 'text' || column.type.includes('text')) {
+            fieldType = 'longtext';
+          }
+          
+          schema[column.name] = { 
+            type: fieldType, 
+            required: isRequired,
+            primary: isPrimary,
+            constraints: column.constraints || []
+          };
+        });
+        
+        console.log('Schema created from API definition:', schema);
+        
+        // Update the tableSchemas state with this schema
+        setTableSchemas(prev => ({
+          ...prev,
+          [tableName]: schema
+        }));
+        
+        return schema;
+      }
+    }
+    
+    // Fallback to creating a default schema if no definition found
+    console.log(`No API definition found for ${tableName}, creating default schema`);
     const schema = {
       id: { type: 'id' },
-      user_id: { type: 'id' }
+      XAuthUserId: { type: 'id' }
     };
     
     // Add timestamp fields that are common
@@ -1647,7 +1758,8 @@ const EndpointsPage = () => {
     if (tableNameLower.includes('user')) {
       schema.username = { type: 'string' };
       schema.email = { type: 'string' };
-      schema.password = { type: 'string' };
+      schema.password_hash = { type: 'string' };
+      schema.role_id = { type: 'id' }; 
     } else if (tableNameLower.includes('post') || tableNameLower.includes('article')) {
       schema.title = { type: 'string' };
       schema.content = { type: 'longtext' };
@@ -1662,7 +1774,7 @@ const EndpointsPage = () => {
       schema.price = { type: 'number' };
     }
     
-    console.log('Default schema created:', schema);
+    console.log('Default fallback schema created:', schema);
     
     // Update the tableSchemas state with this schema
     setTableSchemas(prev => ({
@@ -1698,7 +1810,7 @@ const EndpointsPage = () => {
           </h1>
           <div className="small mb-0 mt-1 d-flex align-items-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
             <Badge bg="info" className="me-2" pill style={{ fontSize: '0.65rem', backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>
-              {userId || 'Loading...'}
+              {XAuthUserId || 'Loading...'}
             </Badge>
             <span>Generated endpoints for your database schema</span>
           </div>
@@ -2310,14 +2422,18 @@ const EndpointsPage = () => {
                       return null;
                     }
                     
-                    // Improved logic for handling user_id field:
-                    // 1. Skip standard user_id field (authentication-related)
-                    // 2. Only show user_id if it's a true relationship field
-                    if (key === 'user_id') {
-                      const isRelationshipField = getForeignKeyReference(key) && relatedTableData[key]?.length > 0;
-                      // Only show user_id if it's a true relationship field that has related data
-                      if (!isRelationshipField) {
-                        return null;
+                    // Improved logic for handling XAuthUserId field:
+                    // For admin table, always show XAuthUserId dropdown
+                    if (key === 'XAuthUserId') {
+                      // For admin table, we always want to show the XAuthUserId field
+                      if (selectedEndpoint?.table === 'admin') {
+                        // Don't return null here, let it flow through to rendering below
+                      } else {
+                        // For other tables, only show if it's a true relationship field with data
+                        const isRelationshipField = getForeignKeyReference(key) && relatedTableData[key]?.length > 0;
+                        if (!isRelationshipField) {
+                          return null;
+                        }
                       }
                     }
                     
@@ -2337,126 +2453,30 @@ const EndpointsPage = () => {
                             className="border bg-dark text-white"
                           >
                             <option value="">Select a {key.replace('_id', '')}</option>
-                            {relatedTableData[key] && relatedTableData[key].length > 0 ? (
-                              relatedTableData[key].map(item => (
-                                <option key={item.id} value={item.id}>
-                                  {getRecordDisplayName(item, getForeignKeyReference(key))}
-                                </option>
-                              ))
+                            {key === 'XAuthUserId' && selectedEndpoint?.table === 'admin' ? (
+                              // For admin table's XAuthUserId field, always try to show users data
+                              userData && userData.length > 0 ? (
+                                userData.map(item => (
+                                  <option key={item.id} value={item.id}>
+                                    {getRecordDisplayName(item, 'users')}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="" disabled>Loading users data...</option>
+                              )
                             ) : (
-                              <option value="" disabled>Loading related data...</option>
+                              // For other fields, use the standard approach
+                              relatedTableData[key] && relatedTableData[key].length > 0 ? (
+                                relatedTableData[key].map(item => (
+                                  <option key={item.id} value={item.id}>
+                                    {getRecordDisplayName(item, getForeignKeyReference(key))}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="" disabled>Loading related data...</option>
+                              )
                             )}
                           </Form.Select>
-                        ) : completeSchemaInfo && key !== 'id' ? (
-                          // Find the field type from the schema
-                          (() => {
-                            // Get the current table schema
-                            const tableSchema = completeSchemaInfo.find(table => table.name === selectedEndpoint?.table);
-                            if (!tableSchema) return null;
-                            
-                            // Get the column definition
-                            const column = tableSchema.columns.find(col => col.name === key);
-                            if (!column) return null;
-                            
-                            // Render appropriate input based on the column type
-                            switch (column.type) {
-                              case 'boolean':
-                                return (
-                                  <Form.Check
-                                    type="checkbox"
-                                    checked={value === true}
-                                    onChange={(e) => handleFormChange(key, e.target.checked)}
-                                    disabled={modalMode === 'read'}
-                                    label={value === true ? 'Yes' : 'No'}
-                                    className="ms-2 text-light"
-                                  />
-                                );
-                              case 'date':
-                                return (
-                                  <Form.Control
-                                    type="date"
-                                    value={value && value.includes('T') ? value.split('T')[0] : value}
-                                    onChange={(e) => handleFormChange(key, e.target.value)}
-                                    disabled={modalMode === 'read'}
-                                    className="border bg-dark text-white"
-                                  />
-                                );
-                              case 'timestamp':
-                              case 'timestamptz':
-                                return (
-                                  <Form.Control
-                                    type="datetime-local"
-                                    value={formatDateTimeForInput(value)}
-                                    onChange={(e) => handleFormChange(key, e.target.value)}
-                                    disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
-                                    className="border bg-dark text-white"
-                                  />
-                                );
-                              case 'int':
-                              case 'integer':
-                              case 'bigint':
-                              case 'smallint':
-                                return (
-                                  <Form.Control
-                                    type="number"
-                                    value={value !== null && value !== undefined ? value : ''}
-                                    onChange={(e) => handleFormChange(key, e.target.value)}
-                                    disabled={modalMode === 'read'}
-                                    className="border bg-dark text-white"
-                                  />
-                                );
-                              case 'float':
-                              case 'double':
-                              case 'decimal':
-                              case 'numeric':
-                                return (
-                                  <Form.Control
-                                    type="number"
-                                    step="0.01"
-                                    value={value !== null && value !== undefined ? value : ''}
-                                    onChange={(e) => handleFormChange(key, e.target.value)}
-                                    disabled={modalMode === 'read'}
-                                    className="border bg-dark text-white"
-                                  />
-                                );
-                              case 'text':
-                                return (
-                                  <Form.Control
-                                    as="textarea"
-                                    rows={3}
-                                    value={value || ''}
-                                    onChange={(e) => handleFormChange(key, e.target.value)}
-                                    disabled={modalMode === 'read'}
-                                    className="border bg-dark text-white"
-                                  />
-                                );
-                              case 'uuid':
-                                if (key.endsWith('_id')) {
-                                  // If it's a UUID field that looks like a foreign key
-                                  // but we don't have related data, render as a text field
-                                  return (
-                                    <Form.Control
-                                      type="text"
-                                      value={value !== null && value !== undefined ? value : ''}
-                                      onChange={(e) => handleFormChange(key, e.target.value)}
-                                      disabled={modalMode === 'read'}
-                                      className="border bg-dark text-white"
-                                    />
-                                  );
-                                }
-                                // Fall through for other UUID fields
-                              default:
-                                return (
-                                  <Form.Control
-                                    type="text"
-                                    value={value !== null && value !== undefined ? value : ''}
-                                    onChange={(e) => handleFormChange(key, e.target.value)}
-                                    disabled={modalMode === 'read'}
-                                    className="border bg-dark text-white"
-                                  />
-                                );
-                            }
-                          })()
                         ) : getFieldType(key, value) === 'date' ? (
                           <Form.Control
                             type="date"

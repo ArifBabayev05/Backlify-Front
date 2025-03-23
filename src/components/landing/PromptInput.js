@@ -49,7 +49,7 @@ const PromptInput = ({ onGenerate }) => {
         },
         body: JSON.stringify({
           prompt: prompt,
-          userId: user ? user.userId : 'guest'
+          XAuthUserId: user ? user.XAuthUserId : 'guest'
         }),
       });
       
