@@ -120,35 +120,52 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }
       };
     });
     
-    // Create edges from relationships
-    const schemaEdges = schema.relationships.map((rel, index) => ({
-      id: `e-${rel.source}-${rel.target}`,
-      source: rel.source,
-      target: rel.target,
-      type: 'schemaEdge',
-      animated: true,
-      data: {
-        relationship: rel.type,
-        sourceField: rel.sourceField,
-        targetField: rel.targetField
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 15,
-        height: 15,
-        color: getRelationshipColor(rel.type),
-      },
-      style: { 
-        stroke: getRelationshipColor(rel.type), 
-        strokeWidth: 2,
-        strokeDasharray: rel.type === 'many-to-many' ? '5 5' : 'none'
-      },
-    }));
+    // Create edges from relationships - prevent duplicates by tracking processed connections
+    const processedConnections = new Set();
+    const schemaEdges = [];
+    
+    schema.relationships.forEach((rel) => {
+      // Create a unique key for this relationship connection (sorted to ensure A→B and B→A create the same key)
+      const tables = [rel.source, rel.target].sort();
+      const fields = rel.source === tables[0] ? 
+        [rel.sourceField, rel.targetField] : 
+        [rel.targetField, rel.sourceField];
+      const connectionKey = `${tables[0]}-${tables[1]}-${fields[0]}-${fields[1]}`;
+      
+      // Only create the edge if we haven't processed this connection yet
+      if (!processedConnections.has(connectionKey)) {
+        processedConnections.add(connectionKey);
+        
+        schemaEdges.push({
+          id: `e-${rel.source}-${rel.target}`,
+          source: rel.source,
+          target: rel.target,
+          type: 'schemaEdge',
+          animated: true,
+          data: {
+            relationship: rel.type,
+            sourceField: rel.sourceField,
+            targetField: rel.targetField
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 15,
+            height: 15,
+            color: getRelationshipColor(rel.type),
+          },
+          style: { 
+            stroke: getRelationshipColor(rel.type), 
+            strokeWidth: 2,
+            strokeDasharray: rel.type === 'many-to-many' ? '5 5' : 'none'
+          },
+        });
+      }
+    });
     
     setNodes(schemaNodes);
     setEdges(schemaEdges);
     
-    // Reset flag after update is complete (with a slight delay to ensure state updates finish)
+    // Reset flag after update is complete
     setTimeout(() => {
       setIsUpdatingFromProps(false);
     }, 0);
@@ -244,6 +261,19 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }
 
   // Add a new relationship
   const handleAddRelationship = (relationship) => {
+    // Check if we already have this relationship or its inverse
+    const isDuplicate = edges.some(edge => 
+      (edge.source === relationship.source && edge.target === relationship.target &&
+       edge.data?.sourceField === relationship.sourceField && edge.data?.targetField === relationship.targetField) ||
+      (edge.source === relationship.target && edge.target === relationship.source &&
+       edge.data?.sourceField === relationship.targetField && edge.data?.targetField === relationship.sourceField)
+    );
+    
+    if (isDuplicate) {
+      // Don't add duplicate relationship
+      return;
+    }
+    
     const newEdge = {
       id: `e-${relationship.source}-${relationship.target}-${Date.now()}`,
       source: relationship.source,

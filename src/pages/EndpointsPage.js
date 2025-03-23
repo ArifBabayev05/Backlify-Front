@@ -40,6 +40,7 @@ const EndpointsPage = () => {
   const [apiId, setApiId] = useState('');
   const [userId, setUserId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // For the full-page loading animation
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [swaggerUrl, setSwaggerUrl] = useState('');
   const navigate = useNavigate();
@@ -58,6 +59,10 @@ const EndpointsPage = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [tableSchemas, setTableSchemas] = useState({});
   const [submitError, setSubmitError] = useState('');
+  const [userData, setUserData] = useState([]);
+  const [relatedTableData, setRelatedTableData] = useState({});
+  // Add state for storing complete schema information
+  const [completeSchemaInfo, setCompleteSchemaInfo] = useState(null);
   
   // Format conversion helpers
   const defaultValueForType = (type) => {
@@ -130,31 +135,318 @@ const EndpointsPage = () => {
     return '';
   };
 
+  // Function to check if a field is a foreign key and extract table reference
+  const getForeignKeyReference = (key) => {
+    // Handle specific common cases first for reliability
+    if (key === 'city_id') return 'cities';
+    if (key === 'member_id') return 'members';
+    if (key === 'book_id') return 'books';
+    if (key === 'user_id') return 'users';
+    
+    // If we have the complete schema information, use it to find relationships
+    if (completeSchemaInfo) {
+      // Find the current table we're working with
+      const currentTable = completeSchemaInfo.find(table => table.name === selectedEndpoint?.table);
+      
+      if (currentTable && currentTable.relationships) {
+        // Look for a relationship where this column is the source
+        const relationship = currentTable.relationships.find(rel => rel.sourceColumn === key);
+        
+        if (relationship) {
+          console.log(`Found relationship for ${key} -> ${relationship.targetTable}`);
+          return relationship.targetTable;
+        }
+      }
+      
+      // Look through all tables for relationships
+      for (const table of completeSchemaInfo) {
+        if (table.relationships) {
+          for (const rel of table.relationships) {
+            if (rel.sourceColumn === key) {
+              console.log(`Found relationship in ${table.name} for ${key} -> ${rel.targetTable}`);
+              return rel.targetTable;
+            }
+          }
+        }
+      }
+      
+      // If we still didn't find anything, try to infer from field name
+      if (key.endsWith('_id')) {
+        const baseTableName = key.replace('_id', '');
+        
+        // Handle special cases for irregular plurals
+        const specialPluralMappings = {
+          'city': 'cities',
+          'category': 'categories',
+          'property': 'properties',
+          'country': 'countries',
+          'company': 'companies',
+          'family': 'families',
+          'person': 'people'
+        };
+        
+        let tableName = baseTableName;
+        if (specialPluralMappings[baseTableName]) {
+          tableName = specialPluralMappings[baseTableName];
+        } else if (!tableName.endsWith('s')) {
+          tableName = `${tableName}s`;
+        }
+        
+        // Check if this table name exists
+        const tableExists = completeSchemaInfo.some(t => t.name === tableName);
+        
+        if (tableExists) {
+          console.log(`Inferred relationship for ${key} -> ${tableName}`);
+          return tableName;
+        }
+      }
+    }
+    
+    // Common fields mapping for fallback
+    const commonRelationships = {
+      'user_id': 'users',
+      'author_id': 'users',
+      'creator_id': 'users',
+      'owner_id': 'users',
+      'book_id': 'books',
+      'member_id': 'members',
+      'student_id': 'students',
+      'course_id': 'courses',
+      'product_id': 'products',
+      'category_id': 'categories',
+      'order_id': 'orders',
+      'customer_id': 'customers',
+      'parent_id': key.replace('_id', 's') // parent_id → parents
+    };
+    
+    // Check our common mappings
+    if (commonRelationships[key]) {
+      console.log(`Using common relationship mapping for ${key} -> ${commonRelationships[key]}`);
+      return commonRelationships[key];
+    }
+    
+    // Check for field naming pattern like 'product_id', 'category_id', etc.
+    if (key.endsWith('_id')) {
+      // Extract the table name from the field - convert to plural if needed
+      let tableName = key.replace('_id', '');
+      
+      // Check common singular/plural patterns
+      if (!tableName.endsWith('s')) {
+        // Most tables are named in plural form
+        tableName = tableName + 's';
+      }
+      
+      // Check if this table exists in our endpoints list
+      const tableExists = endpoints.some(endpoint => endpoint.table === tableName);
+      
+      if (tableExists) {
+        console.log(`Inferred relationship from field name for ${key} -> ${tableName}`);
+        return tableName;
+      }
+    }
+    
+    console.log(`Could not determine relationship for ${key}`);
+    return null;
+  };
+  
+  // Function to get a display name for records from a specified table
+  const getRecordDisplayName = (record, table) => {
+    if (!record) return '';
+    
+    // For users table
+    if (table === 'users') {
+      return record.name || record.username || record.email || `User ${record.id.substring(0, 8)}`;
+    }
+    
+    // Specific handling for common tables
+    if (table === 'books') {
+      return record.title || `Book ${record.id.substring(0, 8)}`;
+    }
+    
+    if (table === 'members') {
+      return record.first_name && record.last_name 
+        ? `${record.first_name} ${record.last_name}`
+        : record.name || record.email || `Member ${record.id.substring(0, 8)}`;
+    }
+    
+    // For loans, show a combination of fields
+    if (table === 'loans') {
+      let display = 'Loan';
+      if (record.id) display += ` ${record.id.substring(0, 8)}`;
+      if (record.loan_date) display += ` (${new Date(record.loan_date).toLocaleDateString()})`;
+      return display;
+    }
+    
+    // For other tables, look for common naming fields in priority order
+    const nameFields = [
+      'name', 'title', 'label', 'display_name', 'full_name',
+      'first_name', 'last_name', 'description', 'subject', 
+      'code', 'reference', 'number'
+    ];
+    
+    for (const field of nameFields) {
+      if (record[field] && typeof record[field] === 'string' && record[field].trim()) {
+        return record[field];
+      }
+    }
+    
+    // Try to combine first_name and last_name if both exist
+    if (record.first_name && record.last_name) {
+      return `${record.first_name} ${record.last_name}`;
+    }
+    
+    // Look for any field containing "name" or "title"
+    for (const key in record) {
+      if (
+        (key.includes('name') || key.includes('title')) && 
+        typeof record[key] === 'string' && 
+        record[key].trim()
+      ) {
+        return record[key];
+      }
+    }
+    
+    // Fall back to ID if no name-like field is found
+    return `${table.charAt(0).toUpperCase() + table.slice(1, -1)} ${record.id.substring(0, 8)}`;
+  };
+
+  // Load related table data for dropdowns
+  const loadRelatedTableData = async (table) => {
+    if (!table || !apiBaseUrl) {
+      console.log('Cannot load related table data: missing table or API base URL');
+      return [];
+    }
+    
+    // Handle special cases for pluralization
+    let tableName = table;
+    
+    // Special case mappings
+    const tableNameMappings = {
+      'city': 'cities',
+      'country': 'countries',
+      'category': 'categories',
+      'property': 'properties'
+    };
+    
+    // Check if we need to adjust the table name
+    if (tableNameMappings[tableName]) {
+      tableName = tableNameMappings[tableName];
+      console.log(`Adjusted table name from ${table} to ${tableName}`);
+    }
+    
+    // Also handle common singular/plural conversions
+    if (!tableName.endsWith('s') && !Object.values(tableNameMappings).includes(tableName)) {
+      // Most tables are named in plural form
+      tableName = tableName + 's';
+      console.log(`Adding plural 's' to get table name: ${tableName}`);
+    }
+    
+    // Special handling for tables with irregular plurals not covered above
+    if (tableName === 'persons') tableName = 'people';
+    
+    try {
+      const url = `${apiBaseUrl}/${tableName}?limit=100`;
+      console.log(`Loading related table data from: ${url}`);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error(`Error loading related data for ${tableName}: ${response.status} ${response.statusText}`);
+        // Try the original table name as fallback
+        if (tableName !== table) {
+          console.log(`Trying original table name: ${table}`);
+          const fallbackUrl = `${apiBaseUrl}/${table}?limit=100`;
+          const fallbackResponse = await fetch(fallbackUrl);
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            if (Array.isArray(fallbackData?.data)) {
+              return fallbackData.data;
+            } else if (Array.isArray(fallbackData)) {
+              return fallbackData;
+            }
+          }
+        }
+        return [];
+      }
+      
+      const data = await response.json();
+      
+      console.log(`Received data from ${tableName}:`, data);
+      
+      if (Array.isArray(data?.data)) {
+        return data.data;
+      } else if (Array.isArray(data)) {
+        return data;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error loading related data for ${tableName}:`, error);
+      return [];
+    }
+  };
+
   useEffect(() => {
+    // Check if we're transitioning from schema page with loading flag
+    const apiLoadingFlag = sessionStorage.getItem('apiLoading');
+    
     // Get real endpoints data from sessionStorage
     const storedEndpoints = sessionStorage.getItem('apiEndpoints');
     
     const loadEndpointsData = async () => {
-      setIsLoading(true);
+      // Always start with loading state active if coming from schema page
+      if (apiLoadingFlag === 'true') {
+        setInitialLoading(true);
+        setIsLoading(true);
+        // Keep the loading animation visible for at least 1 second
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
       try {
         if (!storedEndpoints) {
           console.warn('No API endpoints found in sessionStorage');
+          setInitialLoading(false);
           setIsLoading(false);
           // Redirect back to the schema page if no endpoints are found
           navigate('/schema');
           return;
         }
         
+        // Parse the endpoints data
         const endpointsData = JSON.parse(storedEndpoints);
         console.log('Loaded API endpoints:', endpointsData);
         
         if (!endpointsData || !endpointsData.success) {
           console.error('Invalid endpoints data:', endpointsData);
+          setInitialLoading(false);
           setIsLoading(false);
           // Redirect back to the schema page if endpoints data is invalid
           navigate('/schema');
           return;
+        }
+        
+        // Store the complete schema information if available
+        if (endpointsData.tables) {
+          setCompleteSchemaInfo(endpointsData.tables);
+          console.log('Loaded complete schema information:', endpointsData.tables);
+          
+          // Build table schemas from the complete info
+          const schemas = {};
+          endpointsData.tables.forEach(table => {
+            const schema = {};
+            table.columns.forEach(column => {
+              const isRequired = column.constraints?.includes('not null');
+              const isPrimary = column.constraints?.includes('primary key');
+              schema[column.name] = { 
+                type: column.type, 
+                required: isRequired,
+                primary: isPrimary,
+                constraints: column.constraints || []
+              };
+            });
+            schemas[table.name] = schema;
+          });
+          setTableSchemas(schemas);
         }
         
         // Set basic data first
@@ -358,8 +650,24 @@ const EndpointsPage = () => {
         } else {
           setIsLoading(false);
         }
+        
+        // Pre-load users data for dropdowns
+        if (apiBaseUrl) {
+          loadUsersData();
+        }
+        
+        // Add to the end of the loadEndpointsData function, right before the last catch block
+        console.log('Endpoints data loaded successfully');
+        // Clear the loading flag from sessionStorage
+        sessionStorage.removeItem('apiLoading');
+        // Set loading states to false
+        setInitialLoading(false);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error loading endpoints data:', error);
+        // Clear the loading flag from sessionStorage
+        sessionStorage.removeItem('apiLoading');
+        setInitialLoading(false);
         setIsLoading(false);
         // Navigate back to schema page on error
         navigate('/schema');
@@ -430,6 +738,41 @@ const EndpointsPage = () => {
     }
   };
 
+  const loadUsersData = async () => {
+    if (!apiBaseUrl) {
+      console.log('Cannot load users data: missing API base URL');
+      return;
+    }
+    
+    try {
+      const url = `${apiBaseUrl}/users?limit=100`;
+      console.log(`Loading users data from: ${url}`);
+      
+      const response = await fetch(url);
+      const responseText = await response.text();
+      
+      try {
+        // Try to parse the response as JSON
+        const data = JSON.parse(responseText);
+        console.log(`Received users data:`, data);
+        
+        if (Array.isArray(data?.data)) {
+          setUserData(data.data);
+        } else if (Array.isArray(data)) {
+          setUserData(data);
+        } else {
+          console.warn(`Unexpected data format for users:`, data);
+          setUserData([]);
+        }
+      } catch (parseError) {
+        console.error(`Error parsing response for users:`, parseError);
+        console.log(`Raw response:`, responseText);
+      }
+    } catch (error) {
+      console.error(`Error loading users data:`, error);
+    }
+  };
+
   const handleSelectTable = (table) => {
     setSelectedTable(table);
   };
@@ -470,6 +813,41 @@ const EndpointsPage = () => {
     });
   };
 
+  // Function to extract required fields from the schema
+  const getRequiredFieldsFromSchema = (tableName) => {
+    // If we have complete schema information, use it
+    if (completeSchemaInfo) {
+      const table = completeSchemaInfo.find(t => t.name === tableName);
+      
+      if (table && table.columns) {
+        // Get all columns that have a 'not null' constraint
+        const requiredFields = table.columns
+          .filter(column => column.constraints && column.constraints.includes('not null'))
+          .map(column => column.name);
+          
+        console.log(`Required fields for ${tableName} from schema:`, requiredFields);
+        return requiredFields;
+      }
+    }
+    
+    // Fallback to tableSchemas if available
+    if (tableSchemas && tableSchemas[tableName]) {
+      const schema = tableSchemas[tableName];
+      const requiredFields = Object.entries(schema)
+        .filter(([_, details]) => details.required)
+        .map(([field]) => field);
+      
+      if (requiredFields.length > 0) {
+        console.log(`Required fields for ${tableName} from tableSchemas:`, requiredFields);
+        return requiredFields;
+      }
+    }
+    
+    // Default common required fields if nothing else available
+    return ['id'];
+  };
+
+  // Modify the handleOpenModal function to use the complete schema info
   const handleOpenModal = async (mode, endpoint, record = null) => {
     if (!endpoint) {
       console.error('Cannot open modal: missing endpoint information');
@@ -480,11 +858,103 @@ const EndpointsPage = () => {
     setSelectedEndpoint(endpoint);
     setShowModal(true); // Show modal immediately with loading state
     setIsLoading(true); // Indicate loading
+    setSubmitError('');
     
     // Reset states
     setOperationResult({ show: false, success: false, message: '', data: null });
     
     try {
+      // Special handling for districts - always load cities
+      if (endpoint.table === 'districts') {
+        console.log('Opening districts modal - loading cities data');
+        const citiesData = await loadRelatedTableData('cities');
+        console.log('Loaded cities data:', citiesData);
+        setRelatedTableData(prev => ({
+          ...prev,
+          'city_id': citiesData
+        }));
+      }
+      
+      // Get required fields for this table
+      const requiredFields = getRequiredFieldsFromSchema(endpoint.table);
+      console.log(`Required fields for ${endpoint.table}:`, requiredFields);
+      
+      // Identify all potential foreign key fields (ending with _id)
+      const allPotentialForeignKeys = [];
+      
+      // First, check relationship data from completeSchemaInfo
+      if (completeSchemaInfo) {
+        // Find the current table
+        const currentTable = completeSchemaInfo.find(table => table.name === endpoint.table);
+        
+        if (currentTable) {
+          // Add relationship source columns
+          if (currentTable.relationships) {
+            currentTable.relationships.forEach(rel => {
+              if (rel.sourceColumn !== 'id' && !allPotentialForeignKeys.includes(rel.sourceColumn)) {
+                allPotentialForeignKeys.push(rel.sourceColumn);
+              }
+            });
+          }
+          
+          // Add any column ending with _id from the schema
+          if (currentTable.columns) {
+            currentTable.columns.forEach(column => {
+              if (column.name.endsWith('_id') && column.name !== 'id' && !allPotentialForeignKeys.includes(column.name)) {
+                allPotentialForeignKeys.push(column.name);
+              }
+            });
+          }
+        }
+        
+        // Also check other tables' relationships that might reference this table
+        for (const table of completeSchemaInfo) {
+          if (table.relationships) {
+            table.relationships.forEach(rel => {
+              if (rel.targetTable === endpoint.table && !allPotentialForeignKeys.includes(rel.sourceColumn)) {
+                allPotentialForeignKeys.push(rel.sourceColumn);
+              }
+            });
+          }
+        }
+      }
+      
+      // Also check from the record if available
+      if (record) {
+        Object.keys(record).forEach(key => {
+          if (key.endsWith('_id') && key !== 'id' && !allPotentialForeignKeys.includes(key)) {
+            allPotentialForeignKeys.push(key);
+          }
+        });
+      }
+      
+      console.log(`Identified potential foreign key fields for ${endpoint.table}:`, allPotentialForeignKeys);
+      
+      // Load related data for all potential foreign key fields
+      const relationshipLoading = [];
+      
+      for (const field of allPotentialForeignKeys) {
+        const relatedTable = getForeignKeyReference(field);
+        if (relatedTable) {
+          console.log(`Loading related data for ${field} from table ${relatedTable}`);
+          relationshipLoading.push(
+            loadRelatedTableData(relatedTable).then(data => {
+              setRelatedTableData(prev => ({
+                ...prev,
+                [field]: data
+              }));
+              return { field, relatedTable, data };
+            })
+          );
+        }
+      }
+      
+      // Wait for all relationship data to load
+      if (relationshipLoading.length > 0) {
+        const results = await Promise.allSettled(relationshipLoading);
+        console.log('Finished loading relationship data:', results);
+      }
+      
       // Initialize form data based on mode
       if (mode === 'create') {
         // For create, initialize with empty values based on table schema
@@ -492,10 +962,95 @@ const EndpointsPage = () => {
         
         // Generate a UUID for the id field - required by the backend
         initialFormData.id = generateUUID();
-        initialFormData.user_id = userId || '';
         
-        // Use existing record as template if available
-        if (record) {
+        // Special handling for districts - set default city_id if cities are available
+        if (endpoint.table === 'districts') {
+          const citiesData = await loadRelatedTableData('cities');
+          if (citiesData && citiesData.length > 0) {
+            initialFormData.city_id = citiesData[0].id;
+            console.log(`Setting default city_id to ${citiesData[0].id}`);
+          }
+        }
+        
+        // Get table schema from our complete schema info
+        if (completeSchemaInfo) {
+          const tableSchema = completeSchemaInfo.find(table => table.name === endpoint.table);
+          
+          if (tableSchema && tableSchema.columns) {
+            console.log(`Using schema from completeSchemaInfo for ${endpoint.table}`);
+            
+            // Initialize form fields based on column definitions
+            tableSchema.columns.forEach(column => {
+              if (column.name === 'id' && initialFormData.id) {
+                // Skip if we already set the ID
+                return;
+              }
+              
+              // Set appropriate default values based on column type
+              let defaultValue;
+              
+              switch (column.type) {
+                case 'uuid':
+                  defaultValue = column.name === 'id' ? generateUUID() : '';
+                  break;
+                case 'int':
+                case 'integer':
+                case 'bigint':
+                case 'smallint':
+                  defaultValue = 0;
+                  break;
+                case 'float':
+                case 'double':
+                case 'decimal':
+                case 'numeric':
+                  defaultValue = 0.0;
+                  break;
+                case 'boolean':
+                  defaultValue = false;
+                  break;
+                case 'date':
+                  defaultValue = new Date().toISOString().split('T')[0];
+                  break;
+                case 'timestamp':
+                case 'timestamptz':
+                  // Check if this is a created_at or updated_at field
+                  if (column.name.includes('_at')) {
+                    defaultValue = new Date().toISOString();
+                  } else {
+                    defaultValue = new Date().toISOString();
+                  }
+                  break;
+                default:
+                  defaultValue = '';
+              }
+              
+              initialFormData[column.name] = defaultValue;
+            });
+          }
+        } 
+        else if (tableSchemas[endpoint.table]) {
+          // Fallback to the previously loaded schema
+          console.log('Using cached schema:', tableSchemas[endpoint.table]);
+          Object.entries(tableSchemas[endpoint.table]).forEach(([key, fieldSchema]) => {
+            // Don't overwrite already set fields
+            if (!initialFormData.hasOwnProperty(key)) {
+              let defaultValue = '';
+              
+              if (fieldSchema.type === 'number' || fieldSchema.type === 'integer') {
+                defaultValue = 0;
+              } else if (fieldSchema.type === 'boolean') {
+                defaultValue = false;
+              } else if (fieldSchema.type === 'date' || fieldSchema.type === 'timestamp') {
+                defaultValue = new Date().toISOString().split('T')[0];
+              }
+              
+              initialFormData[key] = defaultValue;
+            }
+          });
+        }
+        
+        // If no schema available, use the record as a template
+        if (Object.keys(initialFormData).length <= 1 && record) {
           console.log('Using existing record as template:', record);
           Object.keys(record).forEach(key => {
             // Don't overwrite already set fields
@@ -511,91 +1066,22 @@ const EndpointsPage = () => {
               }
             }
           });
-        } 
-        // Otherwise use schema if available
-        else if (tableSchemas[endpoint.table]) {
-          console.log('Using cached schema:', tableSchemas[endpoint.table]);
-          Object.keys(tableSchemas[endpoint.table]).forEach(key => {
-            // Don't overwrite already set fields
-            if (!initialFormData.hasOwnProperty(key)) {
-              const fieldSchema = tableSchemas[endpoint.table][key];
-              let defaultValue = '';
-              
-              if (fieldSchema.type === 'number' || fieldSchema.type === 'integer') {
-                defaultValue = 0;
-              } else if (fieldSchema.type === 'boolean') {
-                defaultValue = false;
-              } else if (fieldSchema.type === 'date' || fieldSchema.type === 'timestamp') {
-                defaultValue = new Date().toISOString().split('T')[0];
-              }
-              
-              initialFormData[key] = defaultValue;
-            }
-          });
-        } 
-        // If no schema or record, fetch a schema dynamically
-        else {
-          console.log(`No cached schema for ${endpoint.table}, fetching dynamically`);
-          
-          try {
-            const schema = await fetchTableSchema(endpoint.table);
-            
-            if (schema) {
-              console.log('Using fetched schema:', schema);
-              Object.keys(schema).forEach(key => {
-                // Don't overwrite already set fields
-                if (!initialFormData.hasOwnProperty(key)) {
-                  const fieldSchema = schema[key];
-                  let defaultValue = '';
-                  
-                  if (fieldSchema.type === 'number' || fieldSchema.type === 'integer') {
-                    defaultValue = 0;
-                  } else if (fieldSchema.type === 'boolean') {
-                    defaultValue = false;
-                  } else if (fieldSchema.type === 'date' || fieldSchema.type === 'timestamp') {
-                    defaultValue = new Date().toISOString().split('T')[0];
-                  }
-                  
-                  initialFormData[key] = defaultValue;
-                }
-              });
-            } else {
-              // Fallback to basic fields if no schema available
-              console.warn(`Could not determine schema for ${endpoint.table}, using minimal fields`);
-              
-              // Always include created_at and updated_at as these are common
-              initialFormData.created_at = new Date().toISOString();
-              initialFormData.updated_at = new Date().toISOString();
-              
-              // Try to make an educated guess about other fields based on table name
-              const tableName = endpoint.table.toLowerCase();
-              
-              if (tableName.includes('user')) {
-                initialFormData.username = '';
-                initialFormData.email = '';
-                initialFormData.password = '';
-              } else if (tableName.includes('post') || tableName.includes('article')) {
-                initialFormData.title = '';
-                initialFormData.content = '';
-                initialFormData.author_id = '';
-              } else if (tableName.includes('comment')) {
-                initialFormData.content = '';
-                initialFormData.author_id = '';
-                initialFormData.post_id = '';
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching table schema:', error);
-          }
         }
         
-        // Ensure we have created_at and updated_at fields
-        if (!initialFormData.created_at) {
+        // Ensure we have created_at and updated_at fields if required
+        if (requiredFields.includes('created_at') && !initialFormData.hasOwnProperty('created_at')) {
           initialFormData.created_at = new Date().toISOString();
         }
-        if (!initialFormData.updated_at) {
+        if (requiredFields.includes('updated_at') && !initialFormData.hasOwnProperty('updated_at')) {
           initialFormData.updated_at = new Date().toISOString();
         }
+        
+        // Ensure all required fields are included
+        requiredFields.forEach(field => {
+          if (!initialFormData.hasOwnProperty(field)) {
+            initialFormData[field] = '';
+          }
+        });
         
         console.log('Final form data for create:', initialFormData);
         setFormData(initialFormData);
@@ -606,12 +1092,32 @@ const EndpointsPage = () => {
           console.log(`Setting form data for ${mode} operation:`, record);
           setFormData({ ...record });
           setResourceId(record.id || '');
+          
+          // If we're updating, load related data for foreign keys in this record
+          if (mode === 'update') {
+            const recordForeignKeys = Object.keys(record).filter(key => 
+              key !== 'id' && key.endsWith('_id')
+            );
+            
+            for (const field of recordForeignKeys) {
+              const relatedTable = getForeignKeyReference(field);
+              if (relatedTable) {
+                const data = await loadRelatedTableData(relatedTable);
+                setRelatedTableData(prev => ({
+                  ...prev,
+                  [field]: data
+                }));
+              }
+            }
+          }
         } else {
           console.error(`Cannot perform ${mode} operation: missing record data`);
+          setSubmitError(`Cannot perform ${mode} operation: missing record data`);
         }
       }
     } catch (error) {
       console.error('Error preparing modal form:', error);
+      setSubmitError(`Error preparing form: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -1642,14 +2148,142 @@ const EndpointsPage = () => {
                   {Object.entries(formData).map(([key, value]) => (
                     <Form.Group key={key} className="mb-3">
                       <Form.Label className="text-capitalize text-light">{formatFieldName(key)}</Form.Label>
-                      {key === 'id' || key === 'user_id' || key.includes('_id') ? (
+                      {key === 'id' ? (
                         <Form.Control
                           type="text"
                           value={value}
                           onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={modalMode === 'read' || key === 'id' || (key === 'user_id' && modalMode !== 'update')}
+                          disabled={true}
                           className="border bg-dark text-white"
                         />
+                      ) : key.endsWith('_id') && key !== 'id' ? (
+                        <Form.Select
+                          value={value}
+                          onChange={(e) => handleFormChange(key, e.target.value)}
+                          disabled={modalMode === 'read'}
+                          className="border bg-dark text-white"
+                        >
+                          <option value="">Select a {key.replace('_id', '')}</option>
+                          {relatedTableData[key] && relatedTableData[key].length > 0 ? (
+                            relatedTableData[key].map(item => (
+                              <option key={item.id} value={item.id}>
+                                {getRecordDisplayName(item, getForeignKeyReference(key))}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>Loading related data...</option>
+                          )}
+                        </Form.Select>
+                      ) : completeSchemaInfo && key !== 'id' ? (
+                        // Find the field type from the schema
+                        (() => {
+                          // Get the current table schema
+                          const tableSchema = completeSchemaInfo.find(table => table.name === selectedEndpoint?.table);
+                          if (!tableSchema) return null;
+                          
+                          // Get the column definition
+                          const column = tableSchema.columns.find(col => col.name === key);
+                          if (!column) return null;
+                          
+                          // Render appropriate input based on the column type
+                          switch (column.type) {
+                            case 'boolean':
+                              return (
+                                <Form.Check
+                                  type="checkbox"
+                                  checked={value === true}
+                                  onChange={(e) => handleFormChange(key, e.target.checked)}
+                                  disabled={modalMode === 'read'}
+                                  label={value === true ? 'Yes' : 'No'}
+                                  className="ms-2 text-light"
+                                />
+                              );
+                            case 'date':
+                              return (
+                                <Form.Control
+                                  type="date"
+                                  value={value && value.includes('T') ? value.split('T')[0] : value}
+                                  onChange={(e) => handleFormChange(key, e.target.value)}
+                                  disabled={modalMode === 'read'}
+                                  className="border bg-dark text-white"
+                                />
+                              );
+                            case 'timestamp':
+                            case 'timestamptz':
+                              return (
+                                <Form.Control
+                                  type="datetime-local"
+                                  value={formatDateTimeForInput(value)}
+                                  onChange={(e) => handleFormChange(key, e.target.value)}
+                                  disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
+                                  className="border bg-dark text-white"
+                                />
+                              );
+                            case 'int':
+                            case 'integer':
+                            case 'bigint':
+                            case 'smallint':
+                              return (
+                                <Form.Control
+                                  type="number"
+                                  value={value !== null && value !== undefined ? value : ''}
+                                  onChange={(e) => handleFormChange(key, e.target.value)}
+                                  disabled={modalMode === 'read'}
+                                  className="border bg-dark text-white"
+                                />
+                              );
+                            case 'float':
+                            case 'double':
+                            case 'decimal':
+                            case 'numeric':
+                              return (
+                                <Form.Control
+                                  type="number"
+                                  step="0.01"
+                                  value={value !== null && value !== undefined ? value : ''}
+                                  onChange={(e) => handleFormChange(key, e.target.value)}
+                                  disabled={modalMode === 'read'}
+                                  className="border bg-dark text-white"
+                                />
+                              );
+                            case 'text':
+                              return (
+                                <Form.Control
+                                  as="textarea"
+                                  rows={3}
+                                  value={value || ''}
+                                  onChange={(e) => handleFormChange(key, e.target.value)}
+                                  disabled={modalMode === 'read'}
+                                  className="border bg-dark text-white"
+                                />
+                              );
+                            case 'uuid':
+                              if (key.endsWith('_id')) {
+                                // If it's a UUID field that looks like a foreign key
+                                // but we don't have related data, render as a text field
+                                return (
+                                  <Form.Control
+                                    type="text"
+                                    value={value !== null && value !== undefined ? value : ''}
+                                    onChange={(e) => handleFormChange(key, e.target.value)}
+                                    disabled={modalMode === 'read'}
+                                    className="border bg-dark text-white"
+                                  />
+                                );
+                              }
+                              // Fall through for other UUID fields
+                            default:
+                              return (
+                                <Form.Control
+                                  type="text"
+                                  value={value !== null && value !== undefined ? value : ''}
+                                  onChange={(e) => handleFormChange(key, e.target.value)}
+                                  disabled={modalMode === 'read'}
+                                  className="border bg-dark text-white"
+                                />
+                              );
+                          }
+                        })()
                       ) : getFieldType(key, value) === 'date' ? (
                         <Form.Control
                           type="date"
@@ -1813,6 +2447,89 @@ const EndpointsPage = () => {
           filter: invert(1) grayscale(100%) brightness(200%);
         }
       `}</style>
+      
+      {/* Full-page loading animation */}
+      {initialLoading && (
+        <motion.div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center"
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="position-relative" style={{ marginBottom: '2rem' }}>
+            <div className="position-absolute" style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '200px',
+              height: '200px',
+              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(16, 185, 129, 0.05) 70%)',
+              filter: 'blur(30px)',
+              borderRadius: '50%',
+              zIndex: 0
+            }}></div>
+            <LoadingAnimation />
+          </div>
+          
+          <motion.h2 
+            className="fw-bold mb-3 text-white"
+            animate={{ 
+              opacity: [0.8, 1, 0.8],
+            }}
+            transition={{ 
+              duration: 2, 
+              ease: "easeInOut", 
+              repeat: Infinity 
+            }}
+          >
+            Generating API Endpoints
+          </motion.h2>
+          
+          <motion.p 
+            className="text-white-50 mb-4 fs-5"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            Creating CRUD operations for your tables...
+          </motion.p>
+          
+          <motion.div 
+            style={{ 
+              width: '280px', 
+              height: '4px', 
+              background: 'rgba(59, 130, 246, 0.2)',
+              borderRadius: '2px',
+              overflow: 'hidden',
+              margin: '0 auto'
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+          >
+            <motion.div
+              style={{ 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                borderRadius: '2px'
+              }}
+              animate={{
+                width: ['0%', '100%'],
+              }}
+              transition={{
+                duration: 15,
+                ease: 'easeInOut',
+                repeat: Infinity,
+              }}
+            />
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };

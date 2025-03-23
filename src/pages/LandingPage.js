@@ -6,6 +6,7 @@ import LoadingAnimation from '../components/common/LoadingAnimation';
 import ExamplePromptCard from '../components/common/ExamplePromptCard';
 import { useNavigate } from 'react-router-dom';
 import dbIcon from '../assets/images/db-1.png';
+import { toast } from 'react-hot-toast';
 
 // 3D animation variants
 const containerVariants = {
@@ -40,7 +41,6 @@ const particleConfig = {
 };
 
 const LandingPage = () => {
-  const [isLoading, setIsLoading] = useState(false);
   const [particles, setParticles] = useState([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
@@ -108,35 +108,33 @@ const LandingPage = () => {
 
   // Handle API response and navigate to schema page
   const handleGenerateSchema = (prompt) => {
-    // Show loading animation immediately
-    setIsLoading(true);
+    // At this point, data should already be ready (set by PromptInput)
+    // but we'll double-check to be safe
+    const dataReady = sessionStorage.getItem('dataReady');
     
-    // We don't need to store prompt here anymore, PromptInput does it
-    
-    // Set up polling to check if data is ready (set by PromptInput)
-    const checkDataInterval = setInterval(() => {
-      const dataReady = sessionStorage.getItem('dataReady');
-      
-      if (dataReady === 'true') {
-        // Clear the interval
-        clearInterval(checkDataInterval);
-        
-        // Clear the flag
-        sessionStorage.removeItem('dataReady');
-        
-        // Navigate to schema page
-        setIsLoading(false);
-        navigate('/schema');
-      }
-    }, 500); // Check every 500ms
-    
-    // Safety timeout - if after 20 seconds we haven't received data,
-    // stop waiting and navigate anyway (in case of hang)
-    setTimeout(() => {
-      clearInterval(checkDataInterval);
-      setIsLoading(false);
+    if (dataReady === 'true') {
+      // Data is already ready, navigate immediately
+      console.log('Data ready, navigating to schema page');
+      sessionStorage.removeItem('dataReady'); // Clear the flag
       navigate('/schema');
-    }, 20000);
+    } else {
+      // This shouldn't happen with our updated flow, but just in case
+      console.warn('Data not ready yet, waiting for a moment...');
+      
+      // Small delay to give sessionStorage time to update
+      setTimeout(() => {
+        const dataReadyAfterDelay = sessionStorage.getItem('dataReady');
+        
+        if (dataReadyAfterDelay === 'true') {
+          console.log('Data ready after delay, navigating to schema page');
+          sessionStorage.removeItem('dataReady'); // Clear the flag
+          navigate('/schema');
+        } else {
+          console.error('Data still not ready after delay, showing error');
+          toast.error('Error generating schema. Please try again.');
+        }
+      }, 1000); // 1 second delay
+    }
   };
 
   return (
@@ -349,11 +347,6 @@ const LandingPage = () => {
           </p>
         </div>
       </motion.footer>
-      
-      {/* Loading overlay with full-screen animation */}
-      <AnimatePresence>
-        {isLoading && <LoadingAnimation />}
-      </AnimatePresence>
     </div>
   );
 };
