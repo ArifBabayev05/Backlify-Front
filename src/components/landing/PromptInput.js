@@ -5,6 +5,8 @@ import { toast } from 'react-hot-toast';
 import './PromptInput.css'; // Import custom CSS
 import LoadingAnimation from '../common/LoadingAnimation';
 import SpinnerLoading from '../common/SpinnerLoading';
+import { useAuth } from '../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const examplePrompts = [
   "E-commerce database with products, customers, orders, and reviews",
@@ -16,11 +18,22 @@ const examplePrompts = [
 const PromptInput = ({ onGenerate }) => {
   const [prompt, setPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!prompt.trim()) return;
+    
+    // Check if user is authenticated
+    if (!isAuthenticated()) {
+      // Store the prompt in sessionStorage for potential use after login
+      sessionStorage.setItem('pendingPrompt', prompt);
+      toast.error('Please log in to continue');
+      navigate('/login');
+      return;
+    }
     
     try {
       setIsSubmitting(true);
@@ -36,7 +49,7 @@ const PromptInput = ({ onGenerate }) => {
         },
         body: JSON.stringify({
           prompt: prompt,
-          userId: 'User'
+          userId: user ? user.userId : 'guest'
         }),
       });
       

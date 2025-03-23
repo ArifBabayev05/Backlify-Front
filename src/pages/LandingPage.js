@@ -7,6 +7,7 @@ import ExamplePromptCard from '../components/common/ExamplePromptCard';
 import { useNavigate } from 'react-router-dom';
 import dbIcon from '../assets/images/db-1.png';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../components/auth/AuthContext';
 
 // 3D animation variants
 const containerVariants = {
@@ -44,6 +45,7 @@ const LandingPage = () => {
   const [particles, setParticles] = useState([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
 
   // Example prompt cards data
   const examplePromptCards = [
@@ -108,6 +110,15 @@ const LandingPage = () => {
 
   // Handle API response and navigate to schema page
   const handleGenerateSchema = (prompt) => {
+    // Check if user is authenticated
+    if (!isAuthenticated()) {
+      // Store the prompt in sessionStorage for after login
+      sessionStorage.setItem('pendingPrompt', prompt);
+      toast.error('Please log in to continue');
+      navigate('/login');
+      return;
+    }
+
     // At this point, data should already be ready (set by PromptInput)
     // but we'll double-check to be safe
     const dataReady = sessionStorage.getItem('dataReady');
