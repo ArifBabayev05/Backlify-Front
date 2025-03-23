@@ -36,7 +36,7 @@ const PromptInput = ({ onGenerate }) => {
         },
         body: JSON.stringify({
           prompt: prompt,
-          userId: 'Supabasev2'
+          userId: 'User'
         }),
       });
       

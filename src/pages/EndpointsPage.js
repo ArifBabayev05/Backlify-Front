@@ -387,6 +387,59 @@ const EndpointsPage = () => {
   };
 
   useEffect(() => {
+    // Check if we're still in loading state
+    const isLoading = sessionStorage.getItem('apiLoading') === 'true';
+    const endpointsData = sessionStorage.getItem('apiEndpoints');
+    
+    if (isLoading && !endpointsData) {
+      // If loading but no data yet, set our loading state
+      setIsLoading(true);
+    } else if (endpointsData) {
+      // Make sure we've shown the loading animation for at least 5 seconds
+      const loadingStartTime = parseInt(sessionStorage.getItem('loadingStartTime') || '0');
+      const timeElapsed = Date.now() - loadingStartTime;
+      const minimumLoadingTime = 5000; // 5 seconds
+      
+      if (timeElapsed < minimumLoadingTime) {
+        // Continue showing loading animation for remaining time
+        const remainingTime = minimumLoadingTime - timeElapsed;
+        
+        setTimeout(() => {
+          try {
+            // Parse endpoints data
+            const endpoints = JSON.parse(endpointsData);
+            // Set your endpoints state here
+            setEndpoints(endpoints);
+            // Finally, hide loading animation
+            setIsLoading(false);
+            // Clear loading flags
+            sessionStorage.removeItem('apiLoading');
+            sessionStorage.removeItem('loadingStartTime');
+          } catch (error) {
+            console.error('Error parsing endpoints data:', error);
+            setIsLoading(false);
+          }
+        }, remainingTime);
+      } else {
+        // Minimum time has passed, process the data immediately
+        try {
+          const endpoints = JSON.parse(endpointsData);
+          setEndpoints(endpoints);
+          setIsLoading(false);
+          sessionStorage.removeItem('apiLoading');
+          sessionStorage.removeItem('loadingStartTime');
+        } catch (error) {
+          console.error('Error parsing endpoints data:', error);
+          setIsLoading(false);
+        }
+      }
+    } else {
+      // No data and not loading - either error or user navigated directly
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     // Check if we're transitioning from schema page with loading flag
     const apiLoadingFlag = sessionStorage.getItem('apiLoading');
     

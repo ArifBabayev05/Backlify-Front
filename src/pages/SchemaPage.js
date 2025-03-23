@@ -4,9 +4,8 @@ import { Button, Form, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import SchemaFlow from '../components/schema/SchemaFlow';
 import LoadingAnimation from '../components/common/LoadingAnimation';
+import '../components/schema/SchemaLayout.css';
 
-// Remove or comment out the mock data
-// const mockSchema = { ... };
 
 const SchemaPage = () => {
   const [schema, setSchema] = useState(null);
@@ -25,15 +24,24 @@ const SchemaPage = () => {
   const [currentMessage, setCurrentMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const [generatingEndpoints, setGeneratingEndpoints] = useState(false);
 
-  // Scroll to bottom of chat messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Scroll to bottom of chat messages only when the sidebar is open
+  const scrollToBottom = useCallback(() => {
+    if (sidebarOpen && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'nearest' // This is important - only scroll if needed
+      });
+    }
+  }, [sidebarOpen]);
 
+  // Only scroll when chat messages change AND sidebar is open
   useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages]);
+    if (sidebarOpen && chatMessages.length > 0) {
+      scrollToBottom();
+    }
+  }, [chatMessages, sidebarOpen, scrollToBottom]);
 
   useEffect(() => {
     // Auto-recovery: if schema data exists but dataReady flag doesn't, set it
@@ -277,15 +285,18 @@ const SchemaPage = () => {
 
   const handleGenerateEndpoints = async () => {
     try {
-      // Show loading animation first
-      setIsLoading(true);
-      setApiDataReceived(false);
+      // 1. Set specific state for endpoint generation loading
+      setGeneratingEndpoints(true);
       
-      // Increased delay to ensure loading animation is fully rendered before proceeding
-      // This is crucial for user experience - they need to see the loading state before navigation
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // 2. Wait for the state to update and component to re-render
+      // with loading animation BEFORE doing any work
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Get current schema data from sessionStorage
+      // 3. Store loading state in sessionStorage
+      sessionStorage.setItem('apiLoading', 'true');
+      sessionStorage.setItem('loadingStartTime', Date.now().toString());
+      
+      // 4. Get schema data and prepare payload
       const schemaDataString = sessionStorage.getItem('schemaData');
       if (!schemaDataString) {
         throw new Error('No schema data available');
@@ -293,7 +304,6 @@ const SchemaPage = () => {
       
       const schemaData = JSON.parse(schemaDataString);
       
-      // Prepare the request payload
       const payload = {
         tables: schemaData.tables,
         userId: schemaData.tables[0]?.prefixedName?.split('_')[0] || 'Supabasev2'
@@ -301,7 +311,7 @@ const SchemaPage = () => {
       
       console.log('Sending API generation request:', payload);
       
-      // Send the request to create API from schema
+      // 5. Make the API call
       const response = await fetch('http://localhost:3000/create-api-from-schema', {
         method: 'POST',
         headers: {
@@ -321,20 +331,19 @@ const SchemaPage = () => {
         throw new Error('API generation was unsuccessful');
       }
       
-      // Store the API response in sessionStorage so the endpoints page can access it
+      // 6. Store the API response in sessionStorage
       sessionStorage.setItem('apiEndpoints', JSON.stringify(responseData));
       
-      // Store the loading state in sessionStorage to maintain it across page navigation
-      sessionStorage.setItem('apiLoading', 'true');
+      // 7. Ensure minimum loading time of 6 seconds
+      const loadingStartTime = parseInt(sessionStorage.getItem('loadingStartTime') || '0');
+      const timeElapsed = Date.now() - loadingStartTime;
+      const minimumLoadingTime = 6000; // 6 seconds
       
-      // Force a re-render with a state update to ensure the loading animation is visible
-      await new Promise(resolve => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(resolve); // Double RAF to ensure render completes
-        });
-      });
+      if (timeElapsed < minimumLoadingTime) {
+        await new Promise(resolve => setTimeout(resolve, minimumLoadingTime - timeElapsed));
+      }
       
-      // Navigate to endpoints page while loading state is still active
+      // 8. Navigate to endpoints page while keeping loading state active
       navigate('/endpoints');
       
     } catch (error) {
@@ -343,10 +352,10 @@ const SchemaPage = () => {
       // Show error alert
       alert(`Failed to generate API endpoints: ${error.message}`);
       
-      // Hide loading animation and mark data as received on error
-      setApiDataReceived(true);
-      setIsLoading(false);
+      // Reset loading states
+      setGeneratingEndpoints(false);
       sessionStorage.removeItem('apiLoading');
+      sessionStorage.removeItem('loadingStartTime');
     }
   };
 
@@ -383,9 +392,26 @@ const SchemaPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    const adjustLayout = () => {
+      const element = document.querySelector('.react-flow-wrapper');
+      if (element) {
+        element.style.height = `calc(${window.innerHeight}px - 60px)`;
+      }
+    };
+
+    window.addEventListener('resize', adjustLayout);
+    adjustLayout(); // Initial adjustment
+
+    return () => {
+      window.removeEventListener('resize', adjustLayout);
+    };
+  }, []);
+
   // Handle sending a new prompt to the chatbot
   const handleSendMessage = async (e) => {
     e.preventDefault();
+    e.stopPropagation(); // Stop event propagation
     
     if (!currentMessage.trim()) return;
     
@@ -413,7 +439,7 @@ const SchemaPage = () => {
       const payload = {
         prompt: currentMessage,
         tables: schemaData.tables,
-        userId: 'Supabasev2'
+        userId: 'User'
       };
       
       console.log('Sending schema modification request:', payload);
@@ -557,12 +583,47 @@ const SchemaPage = () => {
     setSidebarOpen(prev => !prev);
   };
 
+  // Add this useEffect to prevent scrolling
+  useEffect(() => {
+    // Function to prevent scrolling
+    const preventScroll = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+    
+    // Apply to document
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // Disable wheel events
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    
+    return () => {
+      // Clean up
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+    };
+  }, []);
+
   return (
     <div 
-      className="min-vh-100 d-flex flex-column" 
+      className="schema-container min-vh-100 d-flex flex-column" 
       style={{ 
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        maxWidth: '100vw',
+        maxHeight: '100vh'
       }}
       ref={pageRef}
     >
@@ -599,21 +660,45 @@ const SchemaPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div>
-          <h1 className="fs-4 fw-bold text-white mb-0 d-flex align-items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2 text-primary">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-            </svg>
-            Database Schema
-            {hasChanges && (
-              <span className="badge bg-warning text-dark ms-2 fs-7">Modified</span>
-            )}
-          </h1>
-          <p className="small mb-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-            {userPrompt 
-              ? `Based on: "${userPrompt.length > 80 ? userPrompt.substring(0, 80) + '...' : userPrompt}"`
-              : 'AI-generated schema visualization'}
-          </p>
+        <div className="d-flex align-items-center">
+          {/* Back to Home button */}
+          <motion.div 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }}
+            className="me-3"
+          >
+            <Button
+              variant="outline-light"
+              onClick={() => navigate('/')}
+              className="d-flex align-items-center"
+              style={{ 
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                padding: '6px 12px'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-1">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Home
+            </Button>
+          </motion.div>
+          
+          <div>
+            <h1 className="fs-4 fw-bold text-white mb-0 d-flex align-items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2 text-primary">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+              </svg>
+              Database Schema
+              {hasChanges && (
+                <span className="badge bg-warning text-dark ms-2 fs-7">Modified</span>
+              )}
+            </h1>
+            <p className="small mb-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              {userPrompt 
+                ? `Based on: "${userPrompt.length > 80 ? userPrompt.substring(0, 80) + '...' : userPrompt}"`
+                : 'AI-generated schema visualization'}
+            </p>
+          </div>
         </div>
         
         <div className="d-flex align-items-center gap-3">
@@ -692,7 +777,9 @@ const SchemaPage = () => {
           className="h-100 position-relative"
           style={{ 
             width: sidebarOpen ? 'calc(100% - 350px)' : '100%',
-            transition: 'width 0.3s ease-in-out'
+            transition: 'width 0.3s ease-in-out',
+            borderRadius: '8px',
+            boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.05)'
           }}
         >
           {schema && !isLoading ? (
@@ -710,15 +797,36 @@ const SchemaPage = () => {
             </motion.div>
           ) : !isLoading && apiDataReceived ? (
             <div className="h-100 d-flex align-items-center justify-content-center">
-              <motion.p 
-                className="text-center p-4"
-                style={{ color: 'rgba(255, 255, 255, 0.6)' }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+              <motion.div 
+                className="text-center p-5 rounded-4"
+                style={{ 
+                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                  maxWidth: '400px',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+                }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5 }}
               >
-                No schema available. Try generating one from the landing page.
-              </motion.p>
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" strokeWidth="1.5" className="mb-3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <h4 className="text-white mb-3">No Schema Available</h4>
+                <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+                  Try generating a schema from the landing page or use the chat assistant to create one.
+                </p>
+                <Button 
+                  variant="primary" 
+                  onClick={() => navigate('/')}
+                  className="mt-3"
+                  style={{ 
+                    background: 'linear-gradient(to right, #3b82f6, #2563eb)',
+                    border: 'none'
+                  }}
+                >
+                  Go to Home Page
+                </Button>
+              </motion.div>
             </div>
           ) : null}
         </div>
@@ -728,23 +836,28 @@ const SchemaPage = () => {
           className="h-100 d-flex flex-column"
           style={{
             width: '350px',
-            background: 'rgba(15, 23, 42, 0.8)',
-            backdropFilter: 'blur(10px)',
-            borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(12px)',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '-5px 0 25px rgba(0, 0, 0, 0.15)',
             transform: sidebarOpen ? 'translateX(0)' : 'translateX(100%)',
             transition: 'transform 0.3s ease-in-out',
             position: 'absolute',
             right: 0,
             top: 0,
             bottom: 0,
-            zIndex: 10
+            zIndex: 10,
+            borderRadius: '0 0 0 12px'
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: sidebarOpen ? 1 : 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Chat header */}
-          <div className="p-3 border-bottom" style={{ borderColor: 'rgba(255, 255, 255, 0.08) !important' }}>
+          {/* Chat header with improved styling */}
+          <div className="p-3 border-bottom" style={{ 
+            borderColor: 'rgba(255, 255, 255, 0.08) !important',
+            background: 'rgba(15, 23, 42, 0.5)'
+          }}>
             <h3 className="fs-5 fw-bold text-white mb-0 d-flex align-items-center">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2 text-primary">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -759,7 +872,10 @@ const SchemaPage = () => {
           {/* Chat messages area */}
           <div 
             className="flex-grow-1 p-3 overflow-auto"
-            style={{ backgroundColor: 'rgba(15, 23, 42, 0.2)' }}
+            style={{ 
+              backgroundColor: 'rgba(15, 23, 42, 0.2)',
+              maxHeight: 'calc(100vh - 200px)' // Constrain height to prevent page scrolling
+            }}
           >
             {chatMessages.length === 0 ? (
               <div className="text-center mt-4" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -812,7 +928,10 @@ const SchemaPage = () => {
           </div>
           
           {/* Chat input area */}
-          <div className="p-3 border-top" style={{ borderColor: 'rgba(255, 255, 255, 0.08) !important' }}>
+          <div className="p-3 border-top" style={{ 
+            borderColor: 'rgba(255, 255, 255, 0.08) !important',
+            background: 'rgba(15, 23, 42, 0.5)'
+          }}>
             <Form onSubmit={handleSendMessage}>
               <div className="d-flex">
                 <Form.Control
@@ -824,7 +943,10 @@ const SchemaPage = () => {
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.1)',
                     border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: 'white'
+                    color: 'white',
+                    boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.2)',
+                    padding: '12px 18px',
+                    fontSize: '0.9rem'
                   }}
                   disabled={isSending}
                 />
@@ -833,10 +955,11 @@ const SchemaPage = () => {
                   variant="primary" 
                   className="rounded-circle d-flex justify-content-center align-items-center"
                   style={{ 
-                    width: '40px', 
-                    height: '40px',
+                    width: '42px', 
+                    height: '42px',
                     background: 'linear-gradient(to right, #3b82f6, #2563eb)',
-                    border: 'none'
+                    border: 'none',
+                    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
                   }}
                   disabled={isSending || !currentMessage.trim()}
                 >
@@ -860,88 +983,7 @@ const SchemaPage = () => {
       </main>
       
       {/* Loading overlay */}
-      {/* {isLoading && (
-        <motion.div 
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center"
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 9999
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="position-relative" style={{ marginBottom: '2rem' }}>
-            <div className="position-absolute" style={{
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '200px',
-              height: '200px',
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(16, 185, 129, 0.05) 70%)',
-              filter: 'blur(30px)',
-              borderRadius: '50%',
-              zIndex: 0
-            }}></div>
-            <LoadingAnimation />
-          </div>
-          
-          <motion.h2 
-            className="fw-bold mb-3 text-white"
-            animate={{ 
-              opacity: [0.8, 1, 0.8],
-            }}
-            transition={{ 
-              duration: 2, 
-              ease: "easeInOut", 
-              repeat: Infinity 
-            }}
-          >
-            Generating API Endpoints
-          </motion.h2>
-          
-          <motion.p 
-            className="text-white-50 mb-4 fs-5"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            Creating CRUD operations for your tables...
-          </motion.p>
-          
-          <motion.div 
-            style={{ 
-              width: '280px', 
-              height: '4px', 
-              background: 'rgba(59, 130, 246, 0.2)',
-              borderRadius: '2px',
-              overflow: 'hidden',
-              margin: '0 auto'
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-          >
-            <motion.div
-              style={{ 
-                height: '100%', 
-                background: 'linear-gradient(90deg, #3b82f6, #10b981)',
-                borderRadius: '2px'
-              }}
-              animate={{
-                width: ['0%', '100%'],
-              }}
-              transition={{
-                duration: 15,
-                ease: 'easeInOut',
-                repeat: Infinity,
-              }}
-            />
-          </motion.div>
-        </motion.div>
-      )} */}
-      {isLoading && <LoadingAnimation />}
+      {(isLoading || generatingEndpoints) && <LoadingAnimation />}
     </div>
   );
 };

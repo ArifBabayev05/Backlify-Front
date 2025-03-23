@@ -3,6 +3,7 @@ import { Handle, Position } from 'reactflow';
 import { Badge } from 'react-bootstrap';
 import { motion } from 'framer-motion';
 import './SchemaNode.css';
+import './SchemaLayout.css';
 
 const SchemaNode = ({ data, selected }) => {
   const [isExpanded, setIsExpanded] = useState(false);
