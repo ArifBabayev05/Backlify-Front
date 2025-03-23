@@ -303,10 +303,13 @@ const SchemaPage = () => {
       }
       
       const schemaData = JSON.parse(schemaDataString);
+      console.log('Schema data:', schemaData);
+      // Make sure we have a userId
+      const userId = schemaData.userId || 'default';
       
       const payload = {
         tables: schemaData.tables,
-        userId: schemaData.tables[0]?.prefixedName?.split('_')[0] || 'Supabasev2'
+        userId: userId
       };
       
       console.log('Sending API generation request:', payload);
@@ -316,6 +319,7 @@ const SchemaPage = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': payload.userId
         },
         body: JSON.stringify(payload)
       });
@@ -331,10 +335,25 @@ const SchemaPage = () => {
         throw new Error('API generation was unsuccessful');
       }
       
-      // 6. Store the API response in sessionStorage
-      sessionStorage.setItem('apiEndpoints', JSON.stringify(responseData));
+      // 6. Create a more complete response for endpoint page
+      const enhancedResponse = {
+        ...responseData,
+        tables: schemaData.tables, // Include the full schema data
+        userId: userId
+      };
       
-      // 7. Ensure minimum loading time of 6 seconds
+      // Store the enhanced API response in sessionStorage
+      sessionStorage.setItem('apiEndpoints', JSON.stringify(enhancedResponse));
+      
+      // 7. Also store the API ID in localStorage for the dashboard to access
+      if (responseData.apiId) {
+        console.log('Storing API ID in localStorage:', responseData.apiId);
+        localStorage.setItem('selectedApiId', responseData.apiId);
+      } else {
+        console.error('No API ID found in response');
+      }
+      
+      // 8. Ensure minimum loading time of 6 seconds
       const loadingStartTime = parseInt(sessionStorage.getItem('loadingStartTime') || '0');
       const timeElapsed = Date.now() - loadingStartTime;
       const minimumLoadingTime = 6000; // 6 seconds
@@ -343,7 +362,7 @@ const SchemaPage = () => {
         await new Promise(resolve => setTimeout(resolve, minimumLoadingTime - timeElapsed));
       }
       
-      // 8. Navigate to endpoints page while keeping loading state active
+      // 9. Navigate to endpoints page while keeping loading state active
       navigate('/endpoints');
       
     } catch (error) {

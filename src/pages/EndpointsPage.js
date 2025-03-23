@@ -63,6 +63,8 @@ const EndpointsPage = () => {
   const [relatedTableData, setRelatedTableData] = useState({});
   // Add state for storing complete schema information
   const [completeSchemaInfo, setCompleteSchemaInfo] = useState(null);
+  // Add error state to the component's state variables
+  const [error, setError] = useState(null);
   
   // Format conversion helpers
   const defaultValueForType = (type) => {
@@ -142,6 +144,8 @@ const EndpointsPage = () => {
     if (key === 'member_id') return 'members';
     if (key === 'book_id') return 'books';
     if (key === 'user_id') return 'users';
+    // Add special case for table 'a'
+    if (key === 'a_id') return 'a';
     
     // If we have the complete schema information, use it to find relationships
     if (completeSchemaInfo) {
@@ -169,37 +173,6 @@ const EndpointsPage = () => {
           }
         }
       }
-      
-      // If we still didn't find anything, try to infer from field name
-      if (key.endsWith('_id')) {
-        const baseTableName = key.replace('_id', '');
-        
-        // Handle special cases for irregular plurals
-        const specialPluralMappings = {
-          'city': 'cities',
-          'category': 'categories',
-          'property': 'properties',
-          'country': 'countries',
-          'company': 'companies',
-          'family': 'families',
-          'person': 'people'
-        };
-        
-        let tableName = baseTableName;
-        if (specialPluralMappings[baseTableName]) {
-          tableName = specialPluralMappings[baseTableName];
-        } else if (!tableName.endsWith('s')) {
-          tableName = `${tableName}s`;
-        }
-        
-        // Check if this table name exists
-        const tableExists = completeSchemaInfo.some(t => t.name === tableName);
-        
-        if (tableExists) {
-          console.log(`Inferred relationship for ${key} -> ${tableName}`);
-          return tableName;
-        }
-      }
     }
     
     // Common fields mapping for fallback
@@ -216,7 +189,10 @@ const EndpointsPage = () => {
       'category_id': 'categories',
       'order_id': 'orders',
       'customer_id': 'customers',
-      'parent_id': key.replace('_id', 's') // parent_id → parents
+      'parent_id': key.replace('_id', 's'), // parent_id → parents
+      'a_id': 'a', // Specific mapping for our schema
+      'b_id': 'b', // Specific mapping for our schema
+      'c_id': 'c'  // Specific mapping for our schema
     };
     
     // Check our common mappings
@@ -334,8 +310,11 @@ const EndpointsPage = () => {
       console.log(`Adjusted table name from ${table} to ${tableName}`);
     }
     
-    // Also handle common singular/plural conversions
-    if (!tableName.endsWith('s') && !Object.values(tableNameMappings).includes(tableName)) {
+    // Single-letter table names should not be pluralized
+    const isSingleLetterTable = /^[a-z]$/i.test(tableName);
+    
+    // Also handle common singular/plural conversions, but only if not a single letter table
+    if (!isSingleLetterTable && !tableName.endsWith('s') && !Object.values(tableNameMappings).includes(tableName)) {
       // Most tables are named in plural form
       tableName = tableName + 's';
       console.log(`Adding plural 's' to get table name: ${tableName}`);
@@ -387,106 +366,199 @@ const EndpointsPage = () => {
   };
 
   useEffect(() => {
-    // Check if we're still in loading state
-    const isLoading = sessionStorage.getItem('apiLoading') === 'true';
-    const endpointsData = sessionStorage.getItem('apiEndpoints');
+    // Clear any previous errors
+    setError(null);
     
-    if (isLoading && !endpointsData) {
-      // If loading but no data yet, set our loading state
-      setIsLoading(true);
-    } else if (endpointsData) {
-      // Make sure we've shown the loading animation for at least 5 seconds
-      const loadingStartTime = parseInt(sessionStorage.getItem('loadingStartTime') || '0');
-      const timeElapsed = Date.now() - loadingStartTime;
-      const minimumLoadingTime = 5000; // 5 seconds
-      
-      if (timeElapsed < minimumLoadingTime) {
-        // Continue showing loading animation for remaining time
-        const remainingTime = minimumLoadingTime - timeElapsed;
-        
-        setTimeout(() => {
-          try {
-            // Parse endpoints data
-            const endpoints = JSON.parse(endpointsData);
-            // Set your endpoints state here
-            setEndpoints(endpoints);
-            // Finally, hide loading animation
-            setIsLoading(false);
-            // Clear loading flags
-            sessionStorage.removeItem('apiLoading');
-            sessionStorage.removeItem('loadingStartTime');
-          } catch (error) {
-            console.error('Error parsing endpoints data:', error);
-            setIsLoading(false);
-          }
-        }, remainingTime);
-      } else {
-        // Minimum time has passed, process the data immediately
-        try {
-          const endpoints = JSON.parse(endpointsData);
-          setEndpoints(endpoints);
-          setIsLoading(false);
-          sessionStorage.removeItem('apiLoading');
-          sessionStorage.removeItem('loadingStartTime');
-        } catch (error) {
-          console.error('Error parsing endpoints data:', error);
-          setIsLoading(false);
-        }
-      }
-    } else {
-      // No data and not loading - either error or user navigated directly
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Check if we're transitioning from schema page with loading flag
+    // First check if we're transitioning from schema page (this should take priority)
     const apiLoadingFlag = sessionStorage.getItem('apiLoading');
-    
-    // Get real endpoints data from sessionStorage
     const storedEndpoints = sessionStorage.getItem('apiEndpoints');
     
-    const loadEndpointsData = async () => {
-      // Always start with loading state active if coming from schema page
-      if (apiLoadingFlag === 'true') {
-        setInitialLoading(true);
-        setIsLoading(true);
-        // Keep the loading animation visible for at least 1 second
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('API loading flag:', apiLoadingFlag);
+    console.log('Stored endpoints available:', !!storedEndpoints);
+    
+    if (apiLoadingFlag === 'true' && storedEndpoints) {
+      console.log('Loading endpoints from session storage');
+      loadEndpointsFromSession(storedEndpoints, apiLoadingFlag);
+      return; // Exit early since we're handling the transition from schema page
+    }
+    
+    // If not coming from schema page, check for a selected API ID from the dashboard
+    const selectedApiId = localStorage.getItem('selectedApiId');
+    console.log('Selected API ID from localStorage:', selectedApiId);
+    
+    if (selectedApiId) {
+      // Use the selected API ID to fetch endpoint data
+      console.log('Loading endpoints for API ID:', selectedApiId);
+      setApiId(selectedApiId);
+      // Initialize the API base URL
+      setApiBaseUrl(`http://localhost:3000/api/${selectedApiId}`);
+      loadApiEndpoints(selectedApiId);
+    } else {
+      // No data and not loading - redirect to dashboard
+      console.log('No API ID or session data, redirecting to dashboard');
+      setIsLoading(false);
+      navigate('/dashboard');
+    }
+  }, [navigate]);
+
+  // New function to load API endpoints directly using the API ID
+  const loadApiEndpoints = async (apiId) => {
+    setInitialLoading(true);
+    setIsLoading(true);
+    
+    try {
+      // Fetch the user's ID from auth context or localStorage
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) {
+        throw new Error('User not authenticated');
       }
       
+      // Make a request to your backend to get the API details
+      const response = await fetch('http://localhost:3000/my-apis', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': userId
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch API details');
+      }
+      
+      const data = await response.json();
+      console.log('API data received:', data);
+      
+      const selectedApi = data.apis.find(api => api.apiId === apiId);
+      
+      if (!selectedApi) {
+        throw new Error('Selected API not found');
+      }
+      
+      console.log('Selected API:', selectedApi);
+      
+      // Initialize endpoints based on the tables in the API
+      const transformedEndpoints = selectedApi.tables.map(table => {
+        return {
+          name: table.charAt(0).toUpperCase() + table.slice(1),
+          baseUrl: `/api/${apiId}/${table}`,
+          table: table,
+          endpoints: [
+            {
+              method: 'GET',
+              path: `/${table}`,
+              description: `List all ${table}`,
+              auth: false,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}`
+            },
+            {
+              method: 'GET',
+              path: `/${table}/:id`,
+              description: `Get a single ${table} by ID`,
+              auth: false,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id`
+            },
+            {
+              method: 'POST',
+              path: `/${table}`,
+              description: `Create a new ${table}`,
+              auth: true,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}`
+            },
+            {
+              method: 'PUT',
+              path: `/${table}/:id`,
+              description: `Update an existing ${table}`,
+              auth: true,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id`
+            },
+            {
+              method: 'DELETE',
+              path: `/${table}/:id`,
+              description: `Delete a ${table}`,
+              auth: true,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id`
+            }
+          ]
+        };
+      });
+      
+      console.log('Transformed endpoints:', transformedEndpoints);
+      
+      // Set endpoints data
+      setEndpoints(transformedEndpoints);
+      setApiBaseUrl(`http://localhost:3000/api/${apiId}`);
+      setSwaggerUrl(`http://localhost:3000/api/${apiId}/swagger.json`);
+      
+      // Set the first table as selected by default if we have endpoints
+      if (transformedEndpoints.length > 0) {
+        setSelectedTable(transformedEndpoints[0].table);
+        
+        // Try to fetch table schema
+        try {
+          await fetchTableSchema(transformedEndpoints[0].table);
+        } catch (error) {
+          console.error('Error fetching table schema:', error);
+        }
+        
+        // Load table data
+        await loadTableData(transformedEndpoints[0].table);
+      }
+    } catch (error) {
+      console.error('Error loading API endpoints:', error);
+      //setError('Failed to load API endpoints: ' + error.message);
+    } finally {
+      setInitialLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Function to handle the existing session storage data loading
+  const loadEndpointsFromSession = async (storedEndpoints, apiLoadingFlag) => {
+    // Always start with loading state active if coming from schema page
+    if (apiLoadingFlag === 'true') {
+      setInitialLoading(true);
+      setIsLoading(true);
+      // Keep the loading animation visible for at least 1 second
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    try {
+      // Parse the endpoints data
+      let endpointsData;
       try {
-        if (!storedEndpoints) {
-          console.warn('No API endpoints found in sessionStorage');
-          setInitialLoading(false);
-          setIsLoading(false);
-          // Redirect back to the schema page if no endpoints are found
-          navigate('/schema');
-          return;
-        }
+        endpointsData = JSON.parse(storedEndpoints);
+        console.log('Loaded API endpoints from session:', endpointsData);
+      } catch (parseError) {
+        console.error('Failed to parse endpoints data:', parseError);
+        throw new Error('Invalid endpoint data format');
+      }
+      
+      if (!endpointsData) {
+        throw new Error('No endpoint data available');
+      }
+      
+      // Set API ID even if there's an issue with the data structure
+      if (endpointsData.apiId) {
+        console.log('Storing API ID in localStorage from session data:', endpointsData.apiId);
+        localStorage.setItem('selectedApiId', endpointsData.apiId);
+        setApiId(endpointsData.apiId);
+        setApiBaseUrl(`http://localhost:3000/api/${endpointsData.apiId}`);
+      } else {
+        console.warn('No API ID found in endpoint data');
+      }
+      
+      // Store the complete schema information if available
+      if (endpointsData.tables) {
+        setCompleteSchemaInfo(endpointsData.tables);
+        console.log('Loaded complete schema information:', endpointsData.tables);
         
-        // Parse the endpoints data
-        const endpointsData = JSON.parse(storedEndpoints);
-        console.log('Loaded API endpoints:', endpointsData);
-        
-        if (!endpointsData || !endpointsData.success) {
-          console.error('Invalid endpoints data:', endpointsData);
-          setInitialLoading(false);
-          setIsLoading(false);
-          // Redirect back to the schema page if endpoints data is invalid
-          navigate('/schema');
-          return;
-        }
-        
-        // Store the complete schema information if available
-        if (endpointsData.tables) {
-          setCompleteSchemaInfo(endpointsData.tables);
-          console.log('Loaded complete schema information:', endpointsData.tables);
-          
-          // Build table schemas from the complete info
-          const schemas = {};
-          endpointsData.tables.forEach(table => {
-            const schema = {};
+        // Build table schemas from the complete info
+        const schemas = {};
+        endpointsData.tables.forEach(table => {
+          const schema = {};
+          if (Array.isArray(table.columns)) {
             table.columns.forEach(column => {
               const isRequired = column.constraints?.includes('not null');
               const isPrimary = column.constraints?.includes('primary key');
@@ -497,238 +569,128 @@ const EndpointsPage = () => {
                 constraints: column.constraints || []
               };
             });
-            schemas[table.name] = schema;
-          });
-          setTableSchemas(schemas);
-        }
-        
-        // Set basic data first
-        setApiId(endpointsData.apiId);
-        setUserId(endpointsData.userId);
-        setSwaggerUrl(`http://localhost:3000${endpointsData.swagger_url}`);
-        
-        // Transform endpoints into a more usable format
-        const transformedEndpoints = endpointsData.endpoints.map(endpoint => {
-          return {
-            name: endpoint.table.charAt(0).toUpperCase() + endpoint.table.slice(1),
-            baseUrl: `/api/${endpointsData.apiId}/${endpoint.table}`,
-            table: endpoint.table,
-            endpoints: endpoint.routes.map(route => {
-              // Determine auth and description based on method and path
-              const auth = route.method !== 'GET';
-              let description = '';
-              
-              switch(route.method) {
-                case 'GET':
-                  description = route.path.includes(':id') 
-                    ? `Get a single ${endpoint.table} by ID` 
-                    : `List all ${endpoint.table}`;
-                  break;
-                case 'POST':
-                  description = `Create a new ${endpoint.table}`;
-                  break;
-                case 'PUT':
-                  description = `Update an existing ${endpoint.table}`;
-                  break;
-                case 'DELETE':
-                  description = `Delete a ${endpoint.table}`;
-                  break;
-                default:
-                  description = route.path;
-              }
-              
-              return {
-                method: route.method,
-                path: route.path,
-                description,
-                auth,
-                fullPath: `http://localhost:3000/api/${endpointsData.apiId}${route.path}`
-              };
-            })
-          };
+          }
+          schemas[table.name] = schema;
         });
-        
-        // Set endpoints data
-        setEndpoints(transformedEndpoints);
-        setApiBaseUrl(`http://localhost:3000/api/${endpointsData.apiId}`);
-        
-        // First check if we have at least one endpoint
-        if (!transformedEndpoints.length) {
-          console.error('No endpoints available');
-          setIsLoading(false);
-          navigate('/schema');
-          return;
-        }
-
-        // Set the first table as selected by default
-        setSelectedTable(transformedEndpoints[0].table);
-
-        // Check if the API is ready with retries
-        const testUrl = `http://localhost:3000/api/${endpointsData.apiId}/${transformedEndpoints[0].table}?limit=1`;
-        let apiReady = false;
-        let apiCheckAttempts = 0;
-        const maxApiCheckAttempts = 5;
-        
-        while (!apiReady && apiCheckAttempts < maxApiCheckAttempts) {
-          console.log(`Checking API readiness (attempt ${apiCheckAttempts + 1}/${maxApiCheckAttempts})`);
-          
-          apiReady = await checkApiReady(testUrl);
-          
-          if (apiReady) {
-            console.log('API is ready to use!');
-            break;
-          }
-          
-          // Wait a bit before trying again
-          console.log(`API not ready, waiting before retry...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          apiCheckAttempts++;
-        }
-        
-        if (!apiReady) {
-          console.error('API is not ready after multiple attempts, redirecting to schema page');
-          setIsLoading(false);
-          // Signal to schema page that API isn't ready yet
-          sessionStorage.setItem('api_not_ready', 'true');
-          navigate('/schema');
-          return;
-        }
-
-        // If we made it here, the API is ready, so we can fetch schemas
-        const schemas = {};
-        let fetchError = false;
-        
-        // Fetch schemas for each table (up to 3 attempts per table with a delay)
-        for (const endpoint of transformedEndpoints) {
-          let attempts = 0;
-          const maxAttempts = 3;
-          
-          while (attempts < maxAttempts) {
-            try {
-              console.log(`Fetching schema for table: ${endpoint.table} (attempt ${attempts + 1}/${maxAttempts})`);
-              
-              const dataResponse = await fetch(`http://localhost:3000/api/${endpointsData.apiId}/${endpoint.table}?limit=1`);
-              
-              if (!dataResponse.ok) {
-                console.error(`Error fetching schema for ${endpoint.table}: ${dataResponse.status} ${dataResponse.statusText}`);
-                
-                // If we've reached max attempts, mark as error and continue to next table
-                if (attempts === maxAttempts - 1) {
-                  fetchError = true;
-                  break;
-                }
-                
-                // Wait before retrying
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                attempts++;
-                continue;
-              }
-              
-              const dataText = await dataResponse.text();
-              
-              try {
-                if (!dataText || dataText.trim() === '') {
-                  console.warn(`Empty response for ${endpoint.table}`);
-                  break; // Move to next table
-                }
-                
-                // Try to parse the response as JSON
-                const data = JSON.parse(dataText);
-                console.log(`Data for ${endpoint.table}:`, data);
-                
-                // Check if we have data to infer schema from
-                if (data && data.data && data.data.length > 0) {
-                  const record = data.data[0];
-                  const schema = {};
-                  
-                  Object.keys(record).forEach(key => {
-                    let type = typeof record[key];
-                    if (type === 'string' && key.includes('date')) {
-                      type = 'date';
-                    } else if (key === 'id' || key.endsWith('_id')) {
-                      type = 'uuid';
-                    }
-                    
-                    schema[key] = { type, required: key === 'id' };
-                  });
-                  
-                  schemas[endpoint.table] = schema;
-                  console.log(`Inferred schema for ${endpoint.table}:`, schema);
-                  break; // Success - exit retry loop
-                } else {
-                  console.log(`No data available for ${endpoint.table} to infer schema`);
-                  break; // Move to next table
-                }
-              } catch (parseError) {
-                console.error(`Error parsing response for ${endpoint.table}:`, parseError);
-                console.log(`Raw response:`, dataText);
-                
-                // If we've reached max attempts, mark as error and continue to next table
-                if (attempts === maxAttempts - 1) {
-                  fetchError = true;
-                  break;
-                }
-                
-                // Wait before retrying
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                attempts++;
-              }
-            } catch (error) {
-              console.error(`Error fetching schema for ${endpoint.table}:`, error);
-              
-              // If we've reached max attempts, mark as error and continue to next table
-              if (attempts === maxAttempts - 1) {
-                fetchError = true;
-                break;
-              }
-              
-              // Wait before retrying
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              attempts++;
-            }
-          }
-        }
-        
-        // Update table schemas with what we've found
         setTableSchemas(schemas);
-        console.log('All schemas loaded:', schemas);
         
-        // If there were errors fetching schemas, still allow the page to load
-        // but maintain the loading state for a short time to ensure UI is ready
-        if (fetchError) {
-          console.warn('Some schemas could not be loaded, but continuing');
-          setTimeout(() => {
-            setIsLoading(false);
-          }, 1000);
-        } else {
-          setIsLoading(false);
+        // Create basic endpoints if they don't exist in the response
+        if (!endpointsData.endpoints || !Array.isArray(endpointsData.endpoints) || endpointsData.endpoints.length === 0) {
+          console.log('No endpoints found in data, creating basic endpoints from tables');
+          const basicEndpoints = endpointsData.tables.map(table => ({
+            table: table.name,
+            routes: [
+              { method: 'GET', path: `/${table.name}` },
+              { method: 'GET', path: `/${table.name}/:id` },
+              { method: 'POST', path: `/${table.name}` },
+              { method: 'PUT', path: `/${table.name}/:id` },
+              { method: 'DELETE', path: `/${table.name}/:id` }
+            ]
+          }));
+          endpointsData.endpoints = basicEndpoints;
         }
-        
-        // Pre-load users data for dropdowns
-        if (apiBaseUrl) {
-          loadUsersData();
-        }
-        
-        // Add to the end of the loadEndpointsData function, right before the last catch block
-        console.log('Endpoints data loaded successfully');
-        // Clear the loading flag from sessionStorage
-        sessionStorage.removeItem('apiLoading');
-        // Set loading states to false
-        setInitialLoading(false);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading endpoints data:', error);
-        // Clear the loading flag from sessionStorage
-        sessionStorage.removeItem('apiLoading');
-        setInitialLoading(false);
-        setIsLoading(false);
-        // Navigate back to schema page on error
-        navigate('/schema');
       }
-    };
-    
-    loadEndpointsData();
-  }, [navigate]);
+      
+      // Set user ID if available
+      if (endpointsData.userId) {
+        setUserId(endpointsData.userId);
+      }
+      
+      // Set swagger URL if available
+      if (endpointsData.swagger_url) {
+        setSwaggerUrl(`http://localhost:3000${endpointsData.swagger_url}`);
+      } else if (endpointsData.apiId) {
+        // Create a default swagger URL based on the API ID
+        setSwaggerUrl(`http://localhost:3000/api/${endpointsData.apiId}/swagger.json`);
+      }
+      
+      // Check if endpoints array exists and is valid
+      if (!endpointsData.endpoints || !Array.isArray(endpointsData.endpoints)) {
+        console.warn('Invalid or missing endpoints array in data');
+        endpointsData.endpoints = [];
+      }
+      
+      // Transform endpoints into a more usable format
+      const transformedEndpoints = endpointsData.endpoints.map(endpoint => {
+        // Make sure routes array exists
+        const routes = Array.isArray(endpoint.routes) ? endpoint.routes : [];
+        return {
+          name: endpoint.table ? endpoint.table.charAt(0).toUpperCase() + endpoint.table.slice(1) : 'Unknown',
+          baseUrl: `/api/${endpointsData.apiId}/${endpoint.table}`,
+          table: endpoint.table || 'unknown',
+          endpoints: routes.map(route => {
+            // Determine auth and description based on method and path
+            const auth = route.method !== 'GET';
+            let description = '';
+            
+            switch(route.method) {
+              case 'GET':
+                description = route.path.includes(':id') 
+                  ? `Get a single ${endpoint.table} by ID` 
+                  : `List all ${endpoint.table}`;
+                break;
+              case 'POST':
+                description = `Create a new ${endpoint.table}`;
+                break;
+              case 'PUT':
+                description = `Update an existing ${endpoint.table}`;
+                break;
+              case 'DELETE':
+                description = `Delete a ${endpoint.table}`;
+                break;
+              default:
+                description = route.path;
+            }
+            
+            return {
+              method: route.method,
+              path: route.path,
+              description,
+              auth,
+              fullPath: `http://localhost:3000/api/${endpointsData.apiId}${route.path}`
+            };
+          })
+        };
+      });
+      
+      // Set endpoints data
+      setEndpoints(transformedEndpoints);
+      
+      // Set the first table as selected by default if we have endpoints
+      if (transformedEndpoints.length > 0) {
+        setSelectedTable(transformedEndpoints[0].table);
+        
+        // Try to fetch table schema and load data
+        try {
+          // We may already have the schema from the complete schema info
+          if (!tableSchemas[transformedEndpoints[0].table]) {
+            await fetchTableSchema(transformedEndpoints[0].table);
+          }
+          await loadTableData(transformedEndpoints[0].table);
+        } catch (schemaError) {
+          console.error('Error fetching initial table data:', schemaError);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading API endpoints from session:', error);
+      //setError('Failed to load API endpoints: ' + error.message);
+      
+      // Clear session storage to prevent repeated errors
+      sessionStorage.removeItem('apiEndpoints');
+      sessionStorage.removeItem('apiLoading');
+      
+      // Redirect back to schema page after a short delay
+      setTimeout(() => {
+        navigate('/schema');
+      }, 2000);
+    } finally {
+      // Clean up loading states
+      setInitialLoading(false);
+      setIsLoading(false);
+      sessionStorage.removeItem('apiLoading');
+      sessionStorage.removeItem('loadingStartTime');
+    }
+  };
 
   useEffect(() => {
     // Load table data when selected table changes
@@ -737,54 +699,68 @@ const EndpointsPage = () => {
     }
   }, [selectedTable, apiBaseUrl]);
 
+  // Update the loadTableData function to add error handling
   const loadTableData = async (table, page = 1, limit = 10) => {
-    if (!table || !apiBaseUrl) {
-      console.log('Cannot load table data: missing table or API base URL');
+    if (!apiId || !table) {
+      console.error('Missing apiId or table name for loading data');
+      //setError('Missing API ID or table name');
       return;
     }
-    
+
     setIsLoading(true);
-    setTableData([]);
-    
     try {
+      console.log(`Loading data for ${table}, page ${page}, limit ${limit}`);
+      
       const url = `${apiBaseUrl}/${table}?page=${page}&limit=${limit}`;
-      console.log(`Loading table data from: ${url}`);
+      console.log('Fetching from URL:', url);
       
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load ${table} data: ${response.status} ${response.statusText}`);
+      }
+      
       const responseText = await response.text();
+      let data;
       
       try {
-        // Try to parse the response as JSON
-        const data = JSON.parse(responseText);
-        console.log(`Received data for ${table}:`, data);
+        data = JSON.parse(responseText);
+        console.log(`${table} data loaded:`, data);
+      } catch (error) {
+        console.error('Error parsing response:', error, 'Raw response:', responseText);
+        throw new Error('Invalid response format');
+      }
+      
+      if (data && data.data) {
+        setTableData(data.data);
         
-        if (Array.isArray(data?.data)) {
-          setTableData(data.data);
+        if (data.pagination) {
           setPagination({
-            page: data.pagination?.page || 1,
-            limit: data.pagination?.limit || 10,
-            total: data.pagination?.total || data.data.length
+            page: data.pagination.page || 1,
+            limit: data.pagination.limit || 10,
+            total: data.pagination.total || 0
           });
-        } else if (Array.isArray(data)) {
-          // Some APIs might return the array directly without a data wrapper
-          setTableData(data);
-          setPagination({
-            page: 1,
-            limit: limit,
-            total: data.length
-          });
-        } else {
-          console.warn(`Unexpected data format for ${table}:`, data);
-          setTableData([]);
-          setPagination({ page: 1, limit: 10, total: 0 });
         }
-      } catch (parseError) {
-        console.error(`Error parsing response for ${table}:`, parseError);
-        console.log(`Raw response:`, responseText);
+        
+        // If we don't have schema information yet, infer it from the data
+        if (!tableSchemas[table] && data.data.length > 0) {
+          const schema = inferSchemaFromRecord(data.data[0]);
+          setTableSchemas(prev => ({
+            ...prev,
+            [table]: schema
+          }));
+        }
+      } else {
         setTableData([]);
+        setPagination({
+          page: 1,
+          limit: 10,
+          total: 0
+        });
       }
     } catch (error) {
       console.error(`Error loading ${table} data:`, error);
+      setError(`Error loading ${table} data: ${error.message}`);
       setTableData([]);
     } finally {
       setIsLoading(false);
@@ -907,6 +883,8 @@ const EndpointsPage = () => {
       return;
     }
     
+    console.log(`Opening modal for ${mode} operation on table ${endpoint.table}`, { endpoint, record });
+    
     setModalMode(mode);
     setSelectedEndpoint(endpoint);
     setShowModal(true); // Show modal immediately with loading state
@@ -917,6 +895,17 @@ const EndpointsPage = () => {
     setOperationResult({ show: false, success: false, message: '', data: null });
     
     try {
+      // Special handling for table 'b' - always load table 'a' data
+      if (endpoint.table === 'b') {
+        console.log('Opening modal for table B - loading table A data');
+        const aData = await loadRelatedTableData('a');
+        console.log('Loaded data from table A:', aData);
+        setRelatedTableData(prev => ({
+          ...prev,
+          'a_id': aData
+        }));
+      }
+      
       // Special handling for districts - always load cities
       if (endpoint.table === 'districts') {
         console.log('Opening districts modal - loading cities data');
@@ -979,6 +968,14 @@ const EndpointsPage = () => {
             allPotentialForeignKeys.push(key);
           }
         });
+      }
+      
+      // Manually add known foreign key fields if not already added
+      if (endpoint.table === 'b' && !allPotentialForeignKeys.includes('a_id')) {
+        allPotentialForeignKeys.push('a_id');
+      }
+      if (endpoint.table === 'c' && !allPotentialForeignKeys.includes('b_id')) {
+        allPotentialForeignKeys.push('b_id');
       }
       
       console.log(`Identified potential foreign key fields for ${endpoint.table}:`, allPotentialForeignKeys);
@@ -1400,20 +1397,32 @@ const EndpointsPage = () => {
 
   // Fetch schema for a table dynamically
   const fetchTableSchema = async (tableName) => {
-    if (!tableName || !apiBaseUrl) {
-      console.error('fetchTableSchema: Missing required parameters', { tableName, apiBaseUrl });
+    if (!tableName) {
+      console.error('fetchTableSchema: Missing table name');
       return null;
     }
     
+    if (!apiBaseUrl && apiId) {
+      // If apiBaseUrl is not set but we have apiId, set it
+      const newApiBaseUrl = `http://localhost:3000/api/${apiId}`;
+      console.log(`Setting API base URL to ${newApiBaseUrl}`);
+      setApiBaseUrl(newApiBaseUrl);
+    }
+    
+    // If we still don't have a valid API URL, return default schema
+    if (!apiBaseUrl && !apiId) {
+      console.error('fetchTableSchema: Missing API base URL and API ID');
+      return inferDefaultSchema(tableName);
+    }
+    
+    const url = `${apiBaseUrl || `http://localhost:3000/api/${apiId}`}/${tableName}?limit=1`;
+    
     console.log(`Fetching schema for table: ${tableName}`);
+    console.log(`Making schema discovery request to: ${url}`);
+    
     setIsLoading(true);
     
-    // First try to get schema from existing data
     try {
-      // Build the URL for fetching table data
-      const url = `${apiBaseUrl}/${tableName}?limit=1`;
-      console.log(`Making schema discovery request to: ${url}`);
-      
       const response = await fetch(url);
       
       // First read the response as text
@@ -2582,6 +2591,19 @@ const EndpointsPage = () => {
             />
           </motion.div>
         </motion.div>
+      )}
+      
+      {/* Add error alert after the header */}
+      {error && (
+        <Alert 
+          variant="danger" 
+          className="m-3"
+          dismissible
+          onClose={() => setError(null)}
+        >
+          <Alert.Heading>Error</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
       )}
     </div>
   );

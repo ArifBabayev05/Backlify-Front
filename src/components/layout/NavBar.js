@@ -60,6 +60,9 @@ const NavBar = () => {
                 {/* <Nav.Link as={Link} to="/schema" onClick={() => setExpanded(false)}>
                   My Schemas
                 </Nav.Link>*/}
+                <Nav.Link as={Link} to="/dashboard" onClick={() => setExpanded(false)}>
+                  Dashboard
+                </Nav.Link>
                 <Nav.Link as={Link} to="/endpoints" onClick={() => setExpanded(false)}>
                   API Endpoints
                 </Nav.Link> 
