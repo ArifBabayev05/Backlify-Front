@@ -3,6 +3,8 @@ import { Button, Form } from 'react-bootstrap';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import './PromptInput.css'; // Import custom CSS
+import LoadingAnimation from '../common/LoadingAnimation';
+import SpinnerLoading from '../common/SpinnerLoading';
 
 const examplePrompts = [
   "E-commerce database with products, customers, orders, and reviews",
@@ -25,11 +27,6 @@ const PromptInput = ({ onGenerate }) => {
       
       // Store prompt in sessionStorage first
       sessionStorage.setItem('userPrompt', prompt);
-      
-      // Show loading animation immediately
-      if (onGenerate) {
-        onGenerate(prompt);
-      }
       
       // API call to generate schema
       const response = await fetch('http://localhost:3000/generate-schema', {
@@ -64,6 +61,11 @@ const PromptInput = ({ onGenerate }) => {
           dataReady: sessionStorage.getItem('dataReady'),
           hasSchemaData: !!sessionStorage.getItem('schemaData')
         });
+        
+        // Only trigger navigation after data is successfully stored
+        if (onGenerate) {
+          onGenerate(prompt);
+        }
       } else {
         console.error('Invalid schema data structure:', data);
         throw new Error('Invalid schema data received');
@@ -74,6 +76,8 @@ const PromptInput = ({ onGenerate }) => {
       setIsSubmitting(false);
       sessionStorage.removeItem('dataReady');
       toast.error('Failed to generate schema. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -168,12 +172,13 @@ const PromptInput = ({ onGenerate }) => {
                   resize: 'none',
                   boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)'
                 }}
+                disabled={isSubmitting}
               />
             </Form.Group>
             
             <motion.div
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: isSubmitting ? 1 : 1.01 }}
+              whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
               className="d-grid gap-2"
             >
               <Button
@@ -190,7 +195,7 @@ const PromptInput = ({ onGenerate }) => {
                   boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)'
                 }}
               >
-                Generate Schema
+                {isSubmitting ? 'Generating...' : 'Generate Schema'}
               </Button>
             </motion.div>
           </Form>
@@ -219,6 +224,7 @@ const PromptInput = ({ onGenerate }) => {
                       display: 'inline-block'
                     }}
                     onClick={() => handleExampleClick(example)}
+                    disabled={isSubmitting}
                   >
                     {example.length > 30 ? example.substring(0, 30) + '...' : example}
                   </Button>
@@ -227,6 +233,63 @@ const PromptInput = ({ onGenerate }) => {
             </div>
           </div>
         </div>
+        {isSubmitting && (
+          <div className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" 
+               style={{ 
+                 backgroundColor: 'rgba(15, 23, 42, 0.9)', 
+                 zIndex: 20,
+                 backdropFilter: 'blur(8px)',
+                 borderRadius: '10px'
+               }}>
+            <div className="position-relative" style={{ marginBottom: '15px' }}>
+              {/* Add glowing effect behind the loading animation */}
+              <div className="position-absolute" style={{
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '100px',
+                height: '100px',
+                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.6) 0%, rgba(16, 185, 129, 0) 70%)',
+                filter: 'blur(20px)',
+                borderRadius: '50%',
+                opacity: 0.7,
+                zIndex: -1
+              }}></div>
+              <SpinnerLoading embedded={true} />
+            </div>
+            <p className="text-white fw-bold" style={{ fontSize: '1.25rem' }}>Generating your database schema...</p>
+            <p className="text-white-50 small">This may take up to 30 seconds</p>
+            
+            {/* Progress indication */}
+            <motion.div 
+              style={{ 
+                width: '60%', 
+                height: '4px', 
+                background: 'rgba(59, 130, 246, 0.2)',
+                borderRadius: '2px',
+                marginTop: '15px',
+                overflow: 'hidden'
+              }}
+            >
+              <motion.div
+                style={{ 
+                  height: '100%', 
+                  background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                  borderRadius: '2px'
+                }}
+                animate={{
+                  width: ['0%', '100%'],
+                }}
+                transition={{
+                  duration: 25,
+                  ease: 'easeInOut',
+                  repeat: Infinity,
+                  repeatType: 'loop'
+                }}
+              />
+            </motion.div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

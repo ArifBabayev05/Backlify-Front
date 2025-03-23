@@ -277,9 +277,13 @@ const SchemaPage = () => {
 
   const handleGenerateEndpoints = async () => {
     try {
-      // Show loading animation
+      // Show loading animation first
       setIsLoading(true);
       setApiDataReceived(false);
+      
+      // Increased delay to ensure loading animation is fully rendered before proceeding
+      // This is crucial for user experience - they need to see the loading state before navigation
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       // Get current schema data from sessionStorage
       const schemaDataString = sessionStorage.getItem('schemaData');
@@ -320,9 +324,17 @@ const SchemaPage = () => {
       // Store the API response in sessionStorage so the endpoints page can access it
       sessionStorage.setItem('apiEndpoints', JSON.stringify(responseData));
       
-      // Navigate to endpoints page with the API data
-      setApiDataReceived(true);
-      setIsLoading(false);
+      // Store the loading state in sessionStorage to maintain it across page navigation
+      sessionStorage.setItem('apiLoading', 'true');
+      
+      // Force a re-render with a state update to ensure the loading animation is visible
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve); // Double RAF to ensure render completes
+        });
+      });
+      
+      // Navigate to endpoints page while loading state is still active
       navigate('/endpoints');
       
     } catch (error) {
@@ -331,10 +343,10 @@ const SchemaPage = () => {
       // Show error alert
       alert(`Failed to generate API endpoints: ${error.message}`);
       
-    } finally {
-      // Hide loading animation and mark data as received regardless of outcome
+      // Hide loading animation and mark data as received on error
       setApiDataReceived(true);
       setIsLoading(false);
+      sessionStorage.removeItem('apiLoading');
     }
   };
 
@@ -847,9 +859,88 @@ const SchemaPage = () => {
         </motion.div>
       </main>
       
-
-      
       {/* Loading overlay */}
+      {/* {isLoading && (
+        <motion.div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center"
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="position-relative" style={{ marginBottom: '2rem' }}>
+            <div className="position-absolute" style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '200px',
+              height: '200px',
+              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(16, 185, 129, 0.05) 70%)',
+              filter: 'blur(30px)',
+              borderRadius: '50%',
+              zIndex: 0
+            }}></div>
+            <LoadingAnimation />
+          </div>
+          
+          <motion.h2 
+            className="fw-bold mb-3 text-white"
+            animate={{ 
+              opacity: [0.8, 1, 0.8],
+            }}
+            transition={{ 
+              duration: 2, 
+              ease: "easeInOut", 
+              repeat: Infinity 
+            }}
+          >
+            Generating API Endpoints
+          </motion.h2>
+          
+          <motion.p 
+            className="text-white-50 mb-4 fs-5"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            Creating CRUD operations for your tables...
+          </motion.p>
+          
+          <motion.div 
+            style={{ 
+              width: '280px', 
+              height: '4px', 
+              background: 'rgba(59, 130, 246, 0.2)',
+              borderRadius: '2px',
+              overflow: 'hidden',
+              margin: '0 auto'
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+          >
+            <motion.div
+              style={{ 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                borderRadius: '2px'
+              }}
+              animate={{
+                width: ['0%', '100%'],
+              }}
+              transition={{
+                duration: 15,
+                ease: 'easeInOut',
+                repeat: Infinity,
+              }}
+            />
+          </motion.div>
+        </motion.div>
+      )} */}
       {isLoading && <LoadingAnimation />}
     </div>
   );
