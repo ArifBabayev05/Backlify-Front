@@ -78,6 +78,22 @@ const EndpointsPage = () => {
 
   // Format field names for display (convert snake_case to Title Case)
   const formatFieldName = (key) => {
+    // Special handling for known doctor fields
+    const doctorFieldLabels = {
+      'first_name': 'First Name',
+      'last_name': 'Last Name',
+      'specialization': 'Specialization',
+      'created_at': 'Created At',
+      'updated_at': 'Updated At'
+    };
+    
+    // Use predefined label if available
+    if (doctorFieldLabels[key]) {
+      return doctorFieldLabels[key];
+    }
+    
+    // Default formatting logic for other fields
+    // Remove underscores and capitalize each word
     return key
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -139,30 +155,11 @@ const EndpointsPage = () => {
 
   // Function to check if a field is a foreign key and extract table reference
   const getForeignKeyReference = (key) => {
-    // Handle specific common cases first for reliability
-    if (key === 'city_id') return 'cities';
-    if (key === 'member_id') return 'members';
-    if (key === 'book_id') return 'books';
-    if (key === 'user_id') return 'users';
-    // Add special case for table 'a'
-    if (key === 'a_id') return 'a';
-    
     // If we have the complete schema information, use it to find relationships
     if (completeSchemaInfo) {
-      // Find the current table we're working with
-      const currentTable = completeSchemaInfo.find(table => table.name === selectedEndpoint?.table);
+      console.log('Looking for relationship for field:', key);
       
-      if (currentTable && currentTable.relationships) {
-        // Look for a relationship where this column is the source
-        const relationship = currentTable.relationships.find(rel => rel.sourceColumn === key);
-        
-        if (relationship) {
-          console.log(`Found relationship for ${key} -> ${relationship.targetTable}`);
-          return relationship.targetTable;
-        }
-      }
-      
-      // Look through all tables for relationships
+      // First, look for any table that has a relationship where this key is the source column
       for (const table of completeSchemaInfo) {
         if (table.relationships) {
           for (const rel of table.relationships) {
@@ -171,6 +168,24 @@ const EndpointsPage = () => {
               return rel.targetTable;
             }
           }
+        }
+      }
+      
+      // If we didn't find a direct match, check if any table has this column
+      // and infer the target table from the field name
+      if (key.endsWith('_id')) {
+        const baseTableName = key.replace('_id', '');
+        
+        // Search for a table with this name
+        const matchingTable = completeSchemaInfo.find(t => 
+          t.name === baseTableName || 
+          t.name === `${baseTableName}s` || 
+          t.name === baseTableName.replace(/y$/, 'ies')
+        );
+        
+        if (matchingTable) {
+          console.log(`Inferred relationship from field name for ${key} -> ${matchingTable.name}`);
+          return matchingTable.name;
         }
       }
     }
@@ -190,9 +205,6 @@ const EndpointsPage = () => {
       'order_id': 'orders',
       'customer_id': 'customers',
       'parent_id': key.replace('_id', 's'), // parent_id → parents
-      'a_id': 'a', // Specific mapping for our schema
-      'b_id': 'b', // Specific mapping for our schema
-      'c_id': 'c'  // Specific mapping for our schema
     };
     
     // Check our common mappings
@@ -207,8 +219,8 @@ const EndpointsPage = () => {
       let tableName = key.replace('_id', '');
       
       // Check common singular/plural patterns
-      if (!tableName.endsWith('s')) {
-        // Most tables are named in plural form
+      if (!tableName.endsWith('s') && tableName.length > 1) {
+        // Most tables are named in plural form, but don't pluralize single letters
         tableName = tableName + 's';
       }
       
@@ -293,35 +305,69 @@ const EndpointsPage = () => {
       return [];
     }
     
-    // Handle special cases for pluralization
+    console.log(`Loading related table data for: ${table}`);
+    
+    // First check if this table exists in the completeSchemaInfo
     let tableName = table;
+    let tableExists = false;
     
-    // Special case mappings
-    const tableNameMappings = {
-      'city': 'cities',
-      'country': 'countries',
-      'category': 'categories',
-      'property': 'properties'
-    };
-    
-    // Check if we need to adjust the table name
-    if (tableNameMappings[tableName]) {
-      tableName = tableNameMappings[tableName];
-      console.log(`Adjusted table name from ${table} to ${tableName}`);
+    if (completeSchemaInfo) {
+      // Try to find the exact table name
+      const exactMatch = completeSchemaInfo.find(t => t.name === table);
+      if (exactMatch) {
+        tableName = exactMatch.name;
+        tableExists = true;
+        console.log(`Found exact match for table ${table} in schema`);
+      } else {
+        // Try plural form
+        const pluralMatch = completeSchemaInfo.find(t => t.name === `${table}s`);
+        if (pluralMatch) {
+          tableName = pluralMatch.name;
+          tableExists = true;
+          console.log(`Found plural match for table ${table} -> ${tableName}`);
+        } else {
+          // Try replacing 'y' with 'ies' for tables like 'category' -> 'categories'
+          const irregularMatch = completeSchemaInfo.find(t => 
+            t.name === table.replace(/y$/, 'ies')
+          );
+          if (irregularMatch) {
+            tableName = irregularMatch.name;
+            tableExists = true;
+            console.log(`Found irregular plural match for table ${table} -> ${tableName}`);
+          }
+        }
+      }
     }
     
-    // Single-letter table names should not be pluralized
-    const isSingleLetterTable = /^[a-z]$/i.test(tableName);
-    
-    // Also handle common singular/plural conversions, but only if not a single letter table
-    if (!isSingleLetterTable && !tableName.endsWith('s') && !Object.values(tableNameMappings).includes(tableName)) {
-      // Most tables are named in plural form
-      tableName = tableName + 's';
-      console.log(`Adding plural 's' to get table name: ${tableName}`);
+    // If we didn't find it in the schema, use fallback rules
+    if (!tableExists) {
+      // Special case mappings
+      const tableNameMappings = {
+        'city': 'cities',
+        'country': 'countries',
+        'category': 'categories',
+        'property': 'properties'
+      };
+      
+      // Check if we need to adjust the table name
+      if (tableNameMappings[tableName]) {
+        tableName = tableNameMappings[tableName];
+        console.log(`Adjusted table name from ${table} to ${tableName}`);
+      }
+      
+      // Single-letter table names should not be pluralized
+      const isSingleLetterTable = /^[a-z]$/i.test(tableName);
+      
+      // Also handle common singular/plural conversions, but only if not a single letter table
+      if (!isSingleLetterTable && !tableName.endsWith('s') && !Object.values(tableNameMappings).includes(tableName)) {
+        // Most tables are named in plural form
+        tableName = tableName + 's';
+        console.log(`Adding plural 's' to get table name: ${tableName}`);
+      }
+      
+      // Special handling for tables with irregular plurals not covered above
+      if (tableName === 'persons') tableName = 'people';
     }
-    
-    // Special handling for tables with irregular plurals not covered above
-    if (tableName === 'persons') tableName = 'people';
     
     try {
       const url = `${apiBaseUrl}/${tableName}?limit=100`;
@@ -338,6 +384,7 @@ const EndpointsPage = () => {
           const fallbackResponse = await fetch(fallbackUrl);
           if (fallbackResponse.ok) {
             const fallbackData = await fallbackResponse.json();
+            console.log(`Fallback request succeeded for ${table}:`, fallbackData);
             if (Array.isArray(fallbackData?.data)) {
               return fallbackData.data;
             } else if (Array.isArray(fallbackData)) {
@@ -407,12 +454,16 @@ const EndpointsPage = () => {
     setIsLoading(true);
     
     try {
-      // Fetch the user's ID from auth context or localStorage
-      const userId = localStorage.getItem('userId');
+      // Fetch the user's ID from sessionStorage first, then fallback to localStorage
+      const userIdFromSession = sessionStorage.getItem('userId');
+      const userId = userIdFromSession || localStorage.getItem('userId');
       
       if (!userId) {
         throw new Error('User not authenticated');
       }
+      
+      // Update the userId state
+      setUserId(userId);
       
       // Make a request to your backend to get the API details
       const response = await fetch('http://localhost:3000/my-apis', {
@@ -489,7 +540,7 @@ const EndpointsPage = () => {
       // Set endpoints data
       setEndpoints(transformedEndpoints);
       setApiBaseUrl(`http://localhost:3000/api/${apiId}`);
-      setSwaggerUrl(`http://localhost:3000/api/${apiId}/swagger.json`);
+      setSwaggerUrl(`http://localhost:3000/api/${apiId}/docs/`);
       
       // Set the first table as selected by default if we have endpoints
       if (transformedEndpoints.length > 0) {
@@ -601,7 +652,7 @@ const EndpointsPage = () => {
         setSwaggerUrl(`http://localhost:3000${endpointsData.swagger_url}`);
       } else if (endpointsData.apiId) {
         // Create a default swagger URL based on the API ID
-        setSwaggerUrl(`http://localhost:3000/api/${endpointsData.apiId}/swagger.json`);
+        setSwaggerUrl(`http://localhost:3000/api/${endpointsData.apiId}/docs/`);
       }
       
       // Check if endpoints array exists and is valid
@@ -876,6 +927,40 @@ const EndpointsPage = () => {
     return ['id'];
   };
 
+  // Add a function to ensure doctor form fields are properly initialized if table is 'doctors'
+  const ensureDoctorFormFields = (formData, tableName) => {
+    // Only apply special handling to the doctors table
+    if (tableName !== 'doctors') {
+      return formData;
+    }
+    
+    const updatedFormData = { ...formData };
+    
+    // Ensure doctor-specific fields exist
+    if (!updatedFormData.hasOwnProperty('first_name')) {
+      updatedFormData.first_name = '';
+    }
+    
+    if (!updatedFormData.hasOwnProperty('last_name')) {
+      updatedFormData.last_name = '';
+    }
+    
+    if (!updatedFormData.hasOwnProperty('specialization')) {
+      updatedFormData.specialization = '';
+    }
+    
+    // Ensure timestamps are set
+    if (!updatedFormData.hasOwnProperty('created_at')) {
+      updatedFormData.created_at = new Date().toISOString();
+    }
+    
+    if (!updatedFormData.hasOwnProperty('updated_at')) {
+      updatedFormData.updated_at = new Date().toISOString();
+    }
+    
+    return updatedFormData;
+  };
+
   // Modify the handleOpenModal function to use the complete schema info
   const handleOpenModal = async (mode, endpoint, record = null) => {
     if (!endpoint) {
@@ -895,31 +980,12 @@ const EndpointsPage = () => {
     setOperationResult({ show: false, success: false, message: '', data: null });
     
     try {
-      // Special handling for table 'b' - always load table 'a' data
-      if (endpoint.table === 'b') {
-        console.log('Opening modal for table B - loading table A data');
-        const aData = await loadRelatedTableData('a');
-        console.log('Loaded data from table A:', aData);
-        setRelatedTableData(prev => ({
-          ...prev,
-          'a_id': aData
-        }));
-      }
-      
-      // Special handling for districts - always load cities
-      if (endpoint.table === 'districts') {
-        console.log('Opening districts modal - loading cities data');
-        const citiesData = await loadRelatedTableData('cities');
-        console.log('Loaded cities data:', citiesData);
-        setRelatedTableData(prev => ({
-          ...prev,
-          'city_id': citiesData
-        }));
-      }
-      
       // Get required fields for this table
       const requiredFields = getRequiredFieldsFromSchema(endpoint.table);
       console.log(`Required fields for ${endpoint.table}:`, requiredFields);
+      
+      // Get user ID from sessionStorage
+      const userIdFromSession = sessionStorage.getItem('userId') || userId;
       
       // Identify all potential foreign key fields (ending with _id)
       const allPotentialForeignKeys = [];
@@ -928,6 +994,7 @@ const EndpointsPage = () => {
       if (completeSchemaInfo) {
         // Find the current table
         const currentTable = completeSchemaInfo.find(table => table.name === endpoint.table);
+        console.log(`Current table for identifying foreign keys:`, currentTable);
         
         if (currentTable) {
           // Add relationship source columns
@@ -935,6 +1002,7 @@ const EndpointsPage = () => {
             currentTable.relationships.forEach(rel => {
               if (rel.sourceColumn !== 'id' && !allPotentialForeignKeys.includes(rel.sourceColumn)) {
                 allPotentialForeignKeys.push(rel.sourceColumn);
+                console.log(`Added foreign key from relationship: ${rel.sourceColumn} -> ${rel.targetTable}`);
               }
             });
           }
@@ -944,6 +1012,7 @@ const EndpointsPage = () => {
             currentTable.columns.forEach(column => {
               if (column.name.endsWith('_id') && column.name !== 'id' && !allPotentialForeignKeys.includes(column.name)) {
                 allPotentialForeignKeys.push(column.name);
+                console.log(`Added foreign key from column name: ${column.name}`);
               }
             });
           }
@@ -955,6 +1024,7 @@ const EndpointsPage = () => {
             table.relationships.forEach(rel => {
               if (rel.targetTable === endpoint.table && !allPotentialForeignKeys.includes(rel.sourceColumn)) {
                 allPotentialForeignKeys.push(rel.sourceColumn);
+                console.log(`Added foreign key from cross-table relationship: ${rel.sourceColumn}`);
               }
             });
           }
@@ -966,16 +1036,9 @@ const EndpointsPage = () => {
         Object.keys(record).forEach(key => {
           if (key.endsWith('_id') && key !== 'id' && !allPotentialForeignKeys.includes(key)) {
             allPotentialForeignKeys.push(key);
+            console.log(`Added foreign key from record: ${key}`);
           }
         });
-      }
-      
-      // Manually add known foreign key fields if not already added
-      if (endpoint.table === 'b' && !allPotentialForeignKeys.includes('a_id')) {
-        allPotentialForeignKeys.push('a_id');
-      }
-      if (endpoint.table === 'c' && !allPotentialForeignKeys.includes('b_id')) {
-        allPotentialForeignKeys.push('b_id');
       }
       
       console.log(`Identified potential foreign key fields for ${endpoint.table}:`, allPotentialForeignKeys);
@@ -1034,6 +1097,18 @@ const EndpointsPage = () => {
               if (column.name === 'id' && initialFormData.id) {
                 // Skip if we already set the ID
                 return;
+              }
+              
+              // Skip user_id field for doctors table (unless it's a relationship field)
+              if (endpoint.table === 'doctors' && column.name === 'user_id') {
+                // Check if it's a relationship field
+                const isRelationshipField = tableSchema.relationships?.some(rel => 
+                  rel.sourceColumn === 'user_id' || rel.targetColumn === 'user_id'
+                );
+                
+                if (!isRelationshipField) {
+                  return; // Skip this field
+                }
               }
               
               // Set appropriate default values based on column type
@@ -1134,13 +1209,27 @@ const EndpointsPage = () => {
         });
         
         console.log('Final form data for create:', initialFormData);
+        
+        // Ensure user_id is set correctly
+        initialFormData = ensureUserIdInFormData(initialFormData);
+        
+        // Apply special handling for doctors table
+        initialFormData = ensureDoctorFormFields(initialFormData, endpoint.table);
+        
         setFormData(initialFormData);
         setResourceId(initialFormData.id);
       } else if (mode === 'read' || mode === 'update' || mode === 'delete') {
         // For other modes, use the provided record data
         if (record) {
           console.log(`Setting form data for ${mode} operation:`, record);
-          setFormData({ ...record });
+          
+          // Make a copy of the record and ensure user_id is set correctly
+          let updatedRecord = ensureUserIdInFormData({ ...record });
+          
+          // Apply special handling for doctors table
+          updatedRecord = ensureDoctorFormFields(updatedRecord, endpoint.table);
+          
+          setFormData(updatedRecord);
           setResourceId(record.id || '');
           
           // If we're updating, load related data for foreign keys in this record
@@ -1216,6 +1305,18 @@ const EndpointsPage = () => {
     return 'text';
   };
 
+  // Add a function to ensure user_id is set correctly in form data
+  const ensureUserIdInFormData = (data) => {
+    const userIdFromSession = sessionStorage.getItem('userId');
+    const currentUserId = userIdFromSession || userId;
+    
+    if (!data.user_id && currentUserId) {
+      return { ...data, user_id: currentUserId };
+    }
+    
+    return data;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -1238,7 +1339,9 @@ const EndpointsPage = () => {
       const requestUrl = modalMode === 'create' ? resourceUrl : `${resourceUrl}/${resourceId}`;
       
       console.log(`Submitting ${modalMode} request to:`, requestUrl);
-      console.log('Form data being sent:', formData);
+      
+      // Get the latest user ID from sessionStorage
+      const userIdFromSession = sessionStorage.getItem('userId') || userId;
       
       // Configure the request based on the operation
       let requestConfig = {
@@ -1254,10 +1357,7 @@ const EndpointsPage = () => {
           requestConfig.method = 'POST';
           // Make sure the formData has the userId included
           {
-            const formDataWithUserId = { ...formData };
-            if (!formDataWithUserId.user_id && userId) {
-              formDataWithUserId.user_id = userId;
-            }
+            const formDataWithUserId = ensureUserIdInFormData(formData);
             requestConfig.body = JSON.stringify(formDataWithUserId);
           }
           break;
@@ -1265,10 +1365,7 @@ const EndpointsPage = () => {
           requestConfig.method = 'PUT';
           // Make sure the formData has the userId included
           {
-            const formDataWithUserId = { ...formData };
-            if (!formDataWithUserId.user_id && userId) {
-              formDataWithUserId.user_id = userId;
-            }
+            const formDataWithUserId = ensureUserIdInFormData(formData);
             requestConfig.body = JSON.stringify(formDataWithUserId);
           }
           break;
@@ -2207,122 +2304,148 @@ const EndpointsPage = () => {
                 </div>
               ) : (
                 <Form onSubmit={handleSubmit}>
-                  {Object.entries(formData).map(([key, value]) => (
-                    <Form.Group key={key} className="mb-3">
-                      <Form.Label className="text-capitalize text-light">{formatFieldName(key)}</Form.Label>
-                      {key === 'id' ? (
-                        <Form.Control
-                          type="text"
-                          value={value}
-                          onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={true}
-                          className="border bg-dark text-white"
-                        />
-                      ) : key.endsWith('_id') && key !== 'id' ? (
-                        <Form.Select
-                          value={value}
-                          onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={modalMode === 'read'}
-                          className="border bg-dark text-white"
-                        >
-                          <option value="">Select a {key.replace('_id', '')}</option>
-                          {relatedTableData[key] && relatedTableData[key].length > 0 ? (
-                            relatedTableData[key].map(item => (
-                              <option key={item.id} value={item.id}>
-                                {getRecordDisplayName(item, getForeignKeyReference(key))}
-                              </option>
-                            ))
-                          ) : (
-                            <option value="" disabled>Loading related data...</option>
-                          )}
-                        </Form.Select>
-                      ) : completeSchemaInfo && key !== 'id' ? (
-                        // Find the field type from the schema
-                        (() => {
-                          // Get the current table schema
-                          const tableSchema = completeSchemaInfo.find(table => table.name === selectedEndpoint?.table);
-                          if (!tableSchema) return null;
-                          
-                          // Get the column definition
-                          const column = tableSchema.columns.find(col => col.name === key);
-                          if (!column) return null;
-                          
-                          // Render appropriate input based on the column type
-                          switch (column.type) {
-                            case 'boolean':
-                              return (
-                                <Form.Check
-                                  type="checkbox"
-                                  checked={value === true}
-                                  onChange={(e) => handleFormChange(key, e.target.checked)}
-                                  disabled={modalMode === 'read'}
-                                  label={value === true ? 'Yes' : 'No'}
-                                  className="ms-2 text-light"
-                                />
-                              );
-                            case 'date':
-                              return (
-                                <Form.Control
-                                  type="date"
-                                  value={value && value.includes('T') ? value.split('T')[0] : value}
-                                  onChange={(e) => handleFormChange(key, e.target.value)}
-                                  disabled={modalMode === 'read'}
-                                  className="border bg-dark text-white"
-                                />
-                              );
-                            case 'timestamp':
-                            case 'timestamptz':
-                              return (
-                                <Form.Control
-                                  type="datetime-local"
-                                  value={formatDateTimeForInput(value)}
-                                  onChange={(e) => handleFormChange(key, e.target.value)}
-                                  disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
-                                  className="border bg-dark text-white"
-                                />
-                              );
-                            case 'int':
-                            case 'integer':
-                            case 'bigint':
-                            case 'smallint':
-                              return (
-                                <Form.Control
-                                  type="number"
-                                  value={value !== null && value !== undefined ? value : ''}
-                                  onChange={(e) => handleFormChange(key, e.target.value)}
-                                  disabled={modalMode === 'read'}
-                                  className="border bg-dark text-white"
-                                />
-                              );
-                            case 'float':
-                            case 'double':
-                            case 'decimal':
-                            case 'numeric':
-                              return (
-                                <Form.Control
-                                  type="number"
-                                  step="0.01"
-                                  value={value !== null && value !== undefined ? value : ''}
-                                  onChange={(e) => handleFormChange(key, e.target.value)}
-                                  disabled={modalMode === 'read'}
-                                  className="border bg-dark text-white"
-                                />
-                              );
-                            case 'text':
-                              return (
-                                <Form.Control
-                                  as="textarea"
-                                  rows={3}
-                                  value={value || ''}
-                                  onChange={(e) => handleFormChange(key, e.target.value)}
-                                  disabled={modalMode === 'read'}
-                                  className="border bg-dark text-white"
-                                />
-                              );
-                            case 'uuid':
-                              if (key.endsWith('_id')) {
-                                // If it's a UUID field that looks like a foreign key
-                                // but we don't have related data, render as a text field
+                  {Object.entries(formData).map(([key, value]) => {
+                    // Skip rendering 'id' field
+                    if (key === 'id') {
+                      return null;
+                    }
+                    
+                    // Improved logic for handling user_id field:
+                    // 1. Skip standard user_id field (authentication-related)
+                    // 2. Only show user_id if it's a true relationship field
+                    if (key === 'user_id') {
+                      const isRelationshipField = getForeignKeyReference(key) && relatedTableData[key]?.length > 0;
+                      // Only show user_id if it's a true relationship field that has related data
+                      if (!isRelationshipField) {
+                        return null;
+                      }
+                    }
+                    
+                    // Hide created_at and updated_at in create mode
+                    if ((key === 'created_at' || key === 'updated_at') && modalMode === 'create') {
+                      return null;
+                    }
+                    
+                    return (
+                      <Form.Group key={key} className="mb-3">
+                        <Form.Label className="text-capitalize text-light">{formatFieldName(key)}</Form.Label>
+                        {key.endsWith('_id') && key !== 'id' ? (
+                          <Form.Select
+                            value={value}
+                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            disabled={modalMode === 'read'}
+                            className="border bg-dark text-white"
+                          >
+                            <option value="">Select a {key.replace('_id', '')}</option>
+                            {relatedTableData[key] && relatedTableData[key].length > 0 ? (
+                              relatedTableData[key].map(item => (
+                                <option key={item.id} value={item.id}>
+                                  {getRecordDisplayName(item, getForeignKeyReference(key))}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>Loading related data...</option>
+                            )}
+                          </Form.Select>
+                        ) : completeSchemaInfo && key !== 'id' ? (
+                          // Find the field type from the schema
+                          (() => {
+                            // Get the current table schema
+                            const tableSchema = completeSchemaInfo.find(table => table.name === selectedEndpoint?.table);
+                            if (!tableSchema) return null;
+                            
+                            // Get the column definition
+                            const column = tableSchema.columns.find(col => col.name === key);
+                            if (!column) return null;
+                            
+                            // Render appropriate input based on the column type
+                            switch (column.type) {
+                              case 'boolean':
+                                return (
+                                  <Form.Check
+                                    type="checkbox"
+                                    checked={value === true}
+                                    onChange={(e) => handleFormChange(key, e.target.checked)}
+                                    disabled={modalMode === 'read'}
+                                    label={value === true ? 'Yes' : 'No'}
+                                    className="ms-2 text-light"
+                                  />
+                                );
+                              case 'date':
+                                return (
+                                  <Form.Control
+                                    type="date"
+                                    value={value && value.includes('T') ? value.split('T')[0] : value}
+                                    onChange={(e) => handleFormChange(key, e.target.value)}
+                                    disabled={modalMode === 'read'}
+                                    className="border bg-dark text-white"
+                                  />
+                                );
+                              case 'timestamp':
+                              case 'timestamptz':
+                                return (
+                                  <Form.Control
+                                    type="datetime-local"
+                                    value={formatDateTimeForInput(value)}
+                                    onChange={(e) => handleFormChange(key, e.target.value)}
+                                    disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
+                                    className="border bg-dark text-white"
+                                  />
+                                );
+                              case 'int':
+                              case 'integer':
+                              case 'bigint':
+                              case 'smallint':
+                                return (
+                                  <Form.Control
+                                    type="number"
+                                    value={value !== null && value !== undefined ? value : ''}
+                                    onChange={(e) => handleFormChange(key, e.target.value)}
+                                    disabled={modalMode === 'read'}
+                                    className="border bg-dark text-white"
+                                  />
+                                );
+                              case 'float':
+                              case 'double':
+                              case 'decimal':
+                              case 'numeric':
+                                return (
+                                  <Form.Control
+                                    type="number"
+                                    step="0.01"
+                                    value={value !== null && value !== undefined ? value : ''}
+                                    onChange={(e) => handleFormChange(key, e.target.value)}
+                                    disabled={modalMode === 'read'}
+                                    className="border bg-dark text-white"
+                                  />
+                                );
+                              case 'text':
+                                return (
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    value={value || ''}
+                                    onChange={(e) => handleFormChange(key, e.target.value)}
+                                    disabled={modalMode === 'read'}
+                                    className="border bg-dark text-white"
+                                  />
+                                );
+                              case 'uuid':
+                                if (key.endsWith('_id')) {
+                                  // If it's a UUID field that looks like a foreign key
+                                  // but we don't have related data, render as a text field
+                                  return (
+                                    <Form.Control
+                                      type="text"
+                                      value={value !== null && value !== undefined ? value : ''}
+                                      onChange={(e) => handleFormChange(key, e.target.value)}
+                                      disabled={modalMode === 'read'}
+                                      className="border bg-dark text-white"
+                                    />
+                                  );
+                                }
+                                // Fall through for other UUID fields
+                              default:
                                 return (
                                   <Form.Control
                                     type="text"
@@ -2332,70 +2455,59 @@ const EndpointsPage = () => {
                                     className="border bg-dark text-white"
                                   />
                                 );
-                              }
-                              // Fall through for other UUID fields
-                            default:
-                              return (
-                                <Form.Control
-                                  type="text"
-                                  value={value !== null && value !== undefined ? value : ''}
-                                  onChange={(e) => handleFormChange(key, e.target.value)}
-                                  disabled={modalMode === 'read'}
-                                  className="border bg-dark text-white"
-                                />
-                              );
-                          }
-                        })()
-                      ) : getFieldType(key, value) === 'date' ? (
-                        <Form.Control
-                          type="date"
-                          value={value && value.includes('T') ? value.split('T')[0] : value}
-                          onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={modalMode === 'read'}
-                          className="border bg-dark text-white"
-                        />
-                      ) : getFieldType(key, value) === 'boolean' ? (
-                        <Form.Check
-                          type="checkbox"
-                          checked={value === true}
-                          onChange={(e) => handleFormChange(key, e.target.checked)}
-                          disabled={modalMode === 'read'}
-                          label={value === true ? 'Yes' : 'No'}
-                          className="ms-2 text-light"
-                        />
-                      ) : getFieldType(key, value) === 'longtext' ? (
-                        <Form.Control
-                          as="textarea"
-                          rows={3}
-                          value={value || ''}
-                          onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={modalMode === 'read'}
-                          className="border bg-dark text-white"
-                        />
-                      ) : getFieldType(key, value) === 'timestamp' ? (
-                        <Form.Control
-                          type="datetime-local"
-                          value={formatDateTimeForInput(value)}
-                          onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
-                          className="border bg-dark text-white"
-                        />
-                      ) : (
-                        <Form.Control
-                          type={getFieldType(key, value) === 'number' ? 'number' : 'text'}
-                          value={value !== null && value !== undefined ? value : ''}
-                          onChange={(e) => handleFormChange(key, e.target.value)}
-                          disabled={modalMode === 'read'}
-                          className="border bg-dark text-white"
-                        />
-                      )}
-                      {getFieldNote(key) && (
-                        <Form.Text className="text-light opacity-75">
-                          {getFieldNote(key)}
-                        </Form.Text>
-                      )}
-                    </Form.Group>
-                  ))}
+                            }
+                          })()
+                        ) : getFieldType(key, value) === 'date' ? (
+                          <Form.Control
+                            type="date"
+                            value={value && value.includes('T') ? value.split('T')[0] : value}
+                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            disabled={modalMode === 'read'}
+                            className="border bg-dark text-white"
+                          />
+                        ) : getFieldType(key, value) === 'boolean' ? (
+                          <Form.Check
+                            type="checkbox"
+                            checked={value === true}
+                            onChange={(e) => handleFormChange(key, e.target.checked)}
+                            disabled={modalMode === 'read'}
+                            label={value === true ? 'Yes' : 'No'}
+                            className="ms-2 text-light"
+                          />
+                        ) : getFieldType(key, value) === 'longtext' ? (
+                          <Form.Control
+                            as="textarea"
+                            rows={3}
+                            value={value || ''}
+                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            disabled={modalMode === 'read'}
+                            className="border bg-dark text-white"
+                          />
+                        ) : getFieldType(key, value) === 'timestamp' ? (
+                          <Form.Control
+                            type="datetime-local"
+                            value={formatDateTimeForInput(value)}
+                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            disabled={modalMode === 'read' || key === 'created_at' || key === 'updated_at'}
+                            className="border bg-dark text-white"
+                          />
+                        ) : (
+                          <Form.Control
+                            type={getFieldType(key, value) === 'number' ? 'number' : 'text'}
+                            value={value !== null && value !== undefined ? value : ''}
+                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            disabled={modalMode === 'read'}
+                            className="border bg-dark text-white"
+                          />
+                        )}
+                        {getFieldNote(key) && (
+                          <Form.Text className="text-light opacity-75">
+                            {getFieldNote(key)}
+                          </Form.Text>
+                        )}
+                      </Form.Group>
+                    );
+                  })}
                   
                   {modalMode !== 'read' && (
                     <div className="d-flex justify-content-end mt-4">

@@ -303,7 +303,8 @@ const SchemaPage = () => {
       }
       
       const schemaData = JSON.parse(schemaDataString);
-      console.log('Schema data:', schemaData);
+      console.log('Schema data for API generation:', schemaData);
+      
       // Make sure we have a userId
       const userId = schemaData.userId || 'default';
       
@@ -335,17 +336,15 @@ const SchemaPage = () => {
         throw new Error('API generation was unsuccessful');
       }
       
-      // 6. Create a more complete response for endpoint page
+      // 6. Create a more complete response for endpoint page by merging response data with local schema data
       const enhancedResponse = {
-        ...responseData,
-        tables: schemaData.tables, // Include the full schema data
-        userId: userId
+        ...responseData
       };
       
-      // Store the enhanced API response in sessionStorage
+      // 7. Store the enhanced API response in sessionStorage
       sessionStorage.setItem('apiEndpoints', JSON.stringify(enhancedResponse));
       
-      // 7. Also store the API ID in localStorage for the dashboard to access
+      // 8. Also store the API ID in localStorage for the dashboard to access
       if (responseData.apiId) {
         console.log('Storing API ID in localStorage:', responseData.apiId);
         localStorage.setItem('selectedApiId', responseData.apiId);
@@ -353,7 +352,7 @@ const SchemaPage = () => {
         console.error('No API ID found in response');
       }
       
-      // 8. Ensure minimum loading time of 6 seconds
+      // 9. Ensure minimum loading time of 6 seconds
       const loadingStartTime = parseInt(sessionStorage.getItem('loadingStartTime') || '0');
       const timeElapsed = Date.now() - loadingStartTime;
       const minimumLoadingTime = 6000; // 6 seconds
@@ -362,7 +361,7 @@ const SchemaPage = () => {
         await new Promise(resolve => setTimeout(resolve, minimumLoadingTime - timeElapsed));
       }
       
-      // 9. Navigate to endpoints page while keeping loading state active
+      // 10. Navigate to endpoints page while keeping loading state active
       navigate('/endpoints');
       
     } catch (error) {
