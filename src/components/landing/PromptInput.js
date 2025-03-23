@@ -44,20 +44,26 @@ const PromptInput = ({ onGenerate }) => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate schema');
+        throw new Error(`Failed to generate schema: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
+      console.log('Received API response:', data);
       
       // Ensure data has the right structure
       if (data && data.tables) {
         // Store the API response directly, ensuring the structure is preserved
-        // It will be transformed in the SchemaPage component
         sessionStorage.setItem('schemaData', JSON.stringify(data));
         console.log('Schema data saved to sessionStorage:', data);
         
         // Set a flag to indicate data is ready
         sessionStorage.setItem('dataReady', 'true');
+        
+        // Double-check that both items were stored correctly
+        console.log('Storage check after saving:',{
+          dataReady: sessionStorage.getItem('dataReady'),
+          hasSchemaData: !!sessionStorage.getItem('schemaData')
+        });
       } else {
         console.error('Invalid schema data structure:', data);
         throw new Error('Invalid schema data received');

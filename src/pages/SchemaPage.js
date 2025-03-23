@@ -36,6 +36,15 @@ const SchemaPage = () => {
   }, [chatMessages]);
 
   useEffect(() => {
+    // Auto-recovery: if schema data exists but dataReady flag doesn't, set it
+    const schemaData = sessionStorage.getItem('schemaData');
+    const dataReady = sessionStorage.getItem('dataReady');
+    
+    if (schemaData && !dataReady) {
+      console.log('Auto-recovery: Setting dataReady flag because schema data exists');
+      sessionStorage.setItem('dataReady', 'true');
+    }
+    
     // Get the prompt from sessionStorage
     const storedPrompt = sessionStorage.getItem('userPrompt');
     if (storedPrompt) {
@@ -45,10 +54,21 @@ const SchemaPage = () => {
     // Set loading state to true at the beginning
     setIsLoading(true);
     
-    // Check if dataReady flag exists
+    // Check if dataReady flag exists and schema data exists
     const checkDataReady = () => {
       const dataReady = sessionStorage.getItem('dataReady');
-      return dataReady === 'true';
+      const hasSchemaData = sessionStorage.getItem('schemaData');
+      console.log('Data ready check:', { dataReady, hasData: !!hasSchemaData });
+      
+      // Modified to check for schemaData even if dataReady is not set
+      if (hasSchemaData && !dataReady) {
+        // Auto-fix the missing dataReady flag
+        console.log('Found schema data but dataReady flag was missing - fixing it');
+        sessionStorage.setItem('dataReady', 'true');
+        return true;
+      }
+      
+      return dataReady === 'true' && !!hasSchemaData;
     };
     
     // Function to process schema data
@@ -75,7 +95,9 @@ const SchemaPage = () => {
                     name: col.name,
                     type: col.type,
                     isPrimary: Array.isArray(col.constraints) && col.constraints.includes('primary key'),
-                    isForeign: Array.isArray(col.constraints) && col.constraints.some(c => c.includes('foreign key')),
+                    isForeign: Array.isArray(col.constraints) && col.constraints.some(c => 
+                      c.includes('foreign key') || c.includes('references')
+                    ),
                     constraints: col.constraints || []
                   })) : []
                 };
@@ -88,17 +110,22 @@ const SchemaPage = () => {
               if (table.relationships && Array.isArray(table.relationships)) {
                 console.log(`Processing ${table.relationships.length} relationships for table ${table.name}`);
                 table.relationships.forEach(rel => {
-                  // Check that all required fields are present
-                  if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
-                    transformedSchema.relationships.push({
-                      source: table.name,
-                      target: rel.targetTable,
-                      type: rel.type,
-                      sourceField: rel.sourceColumn,
-                      targetField: rel.targetColumn
-                    });
-                  } else {
-                    console.warn('Skipping incomplete relationship:', rel);
+                  try {
+                    // Check that all required fields are present
+                    if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
+                      transformedSchema.relationships.push({
+                        source: table.name,
+                        target: rel.targetTable,
+                        type: rel.type,
+                        sourceField: rel.sourceColumn,
+                        targetField: rel.targetColumn
+                      });
+                      console.log(`Added relationship: ${table.name} -> ${rel.targetTable} (${rel.type})`);
+                    } else {
+                      console.warn('Skipping incomplete relationship:', rel);
+                    }
+                  } catch (error) {
+                    console.error('Error processing relationship:', error, rel);
                   }
                 });
               }
@@ -450,7 +477,9 @@ const SchemaPage = () => {
             name: col.name,
             type: col.type,
             isPrimary: Array.isArray(col.constraints) && col.constraints.includes('primary key'),
-            isForeign: Array.isArray(col.constraints) && col.constraints.some(c => c.includes('foreign key')),
+            isForeign: Array.isArray(col.constraints) && col.constraints.some(c => 
+              c.includes('foreign key') || c.includes('references')
+            ),
             constraints: col.constraints || []
           }))
         })),
