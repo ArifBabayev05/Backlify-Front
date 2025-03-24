@@ -63,9 +63,7 @@ const NavBar = () => {
                 <Nav.Link as={Link} to="/dashboard" onClick={() => setExpanded(false)}>
                   Dashboard
                 </Nav.Link>
-                <Nav.Link as={Link} to="/endpoints" onClick={() => setExpanded(false)}>
-                  API Endpoints
-                </Nav.Link> 
+               
                 
                 <Dropdown align="end">
                   <Dropdown.Toggle 

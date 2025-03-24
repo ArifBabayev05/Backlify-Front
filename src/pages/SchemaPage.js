@@ -306,6 +306,7 @@ const SchemaPage = () => {
       console.log('Schema data for API generation:', schemaData);
       
       // Make sure we have a XAuthUserId
+      console.log('Schema data:', schemaData);
       const XAuthUserId = schemaData.XAuthUserId || 'default';
       
       const payload = {

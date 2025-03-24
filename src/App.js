@@ -10,6 +10,7 @@ import EndpointsPage from './pages/EndpointsPage';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import LogsDashboardPage from './pages/LogsDashboardPage';
 
 // Import components
 import NavBar from './components/layout/NavBar';
@@ -61,6 +62,11 @@ function AppRoutes() {
         <Route path="/endpoints" element={
           <RequireAuth>
             <EndpointsPage />
+          </RequireAuth>
+        } />
+        <Route path="/logs" element={
+          <RequireAuth>
+            <LogsDashboardPage />
           </RequireAuth>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />

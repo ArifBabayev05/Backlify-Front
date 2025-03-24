@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, Button, Spinner, Alert, Pagination } from 'r
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthContext';
-import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine } from 'react-icons/fa';
 
 const fadeIn = {
   hidden: { opacity: 0 },
@@ -36,6 +36,9 @@ const DashboardPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [apisPerPage] = useState(6); // Show 6 APIs per page
   const [totalPages, setTotalPages] = useState(1);
+
+  // Check if user is admin
+  const isAdmin = user?.username === 'aa' || user?.username === 'Admin';
 
   useEffect(() => {
     fetchUserApis();
@@ -207,6 +210,16 @@ const DashboardPage = () => {
     return gradients[index % gradients.length];
   };
 
+  // Navigate to home/landing page
+  const navigateToHome = () => {
+    navigate('/');
+  };
+
+  // Navigate to logs dashboard
+  const navigateToLogs = () => {
+    navigate('/logs');
+  };
+
   return (
     <motion.div
       initial="hidden"
@@ -214,22 +227,74 @@ const DashboardPage = () => {
       variants={fadeIn}
       className="min-vh-100 d-flex flex-column"
       style={{
-        background: 'linear-gradient(135deg, #111827 0%, #1f2937 100%)',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
         color: 'white',
-        paddingTop: '6rem',
+        paddingTop: '2rem',
         paddingBottom: '3rem',
         overflowY: 'auto',
         height: '100vh'
       }}
     >
-      <Container className="pb-5">
+      {/* Navigation Bar */}
+      <div className="position-fixed top-0 start-0 w-100 py-3 px-4" style={{ 
+        backdropFilter: 'blur(10px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        zIndex: 1000
+      }}>
+        <Container>
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center">
+              <div className="d-flex align-items-center justify-content-center rounded-circle me-2" 
+                style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  background: 'rgba(59, 130, 246, 0.2)',
+                }}>
+                <FaServer className="text-primary" size={20} />
+              </div>
+              <h5 className="m-0 text-white d-none d-md-block">Backlify Admin</h5>
+            </div>
+            <div className="d-flex gap-2">
+              {isAdmin && (
+                <Button
+                  variant="outline-success"
+                  className="d-flex align-items-center gap-2"
+                  onClick={navigateToLogs}
+                  style={{
+                    borderColor: 'rgba(16, 185, 129, 0.4)',
+                    borderRadius: '8px',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  <FaChartLine size={14} /> <span className="d-none d-md-inline">Logs Dashboard</span>
+                </Button>
+              )}
+              <Button
+                variant="outline-light"
+                className="d-flex align-items-center gap-2"
+                onClick={navigateToHome}
+                style={{
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem'
+                }}
+              >
+                <FaHome size={14} /> <span className="d-none d-md-inline">Return to Home</span>
+              </Button>
+            </div>
+          </div>
+        </Container>
+      </div>
+
+      <Container className="pb-5 mt-5 pt-4">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="text-center mb-5"
         >
-          <h1 className="display-4 fw-bold mb-2" style={{ 
+          <h1 className="display-5 fw-bold mb-2" style={{ 
             background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -275,7 +340,7 @@ const DashboardPage = () => {
             <Card 
               className="border-0 shadow-lg mb-4 mx-auto"
               style={{ 
-                background: 'rgba(31, 41, 55, 0.7)',
+                background: 'rgba(30, 41, 59, 0.7)',
                 backdropFilter: 'blur(10px)',
                 borderRadius: '16px',
                 maxWidth: '600px'
@@ -316,6 +381,9 @@ const DashboardPage = () => {
           </motion.div>
         ) : (
           <>
+            {/* Search Bar */}
+            
+
             <motion.div variants={staggerItems}>
               <Row className="g-4">
                 {currentApis.map((api, index) => (
@@ -324,7 +392,7 @@ const DashboardPage = () => {
                       <Card 
                         className="h-100 border-0 shadow-lg overflow-hidden"
                         style={{ 
-                          background: 'rgba(31, 41, 55, 0.6)',
+                          background: 'rgba(30, 41, 59, 0.7)',
                           backdropFilter: 'blur(10px)',
                           borderRadius: '16px',
                           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -388,7 +456,7 @@ const DashboardPage = () => {
                             </span>
                           </Card.Text>
 
-                          <div className="mt-auto pt-3 border-top border-gray-700 d-flex align-items-center">
+                          <div className="mt-auto pt-3 border-top border-dark d-flex align-items-center">
                             <FaCalendarAlt className="text-light opacity-50 me-2" size={12} />
                             <small className="text-light opacity-75">
                               Created: {formatDate(api.createdAt)}
@@ -407,7 +475,7 @@ const DashboardPage = () => {
               <div className="d-flex justify-content-center mt-5">
                 <Pagination 
                   style={{ 
-                    '--bs-pagination-bg': 'rgba(31, 41, 55, 0.5)',
+                    '--bs-pagination-bg': 'rgba(30, 41, 59, 0.7)',
                     '--bs-pagination-border-color': 'rgba(255, 255, 255, 0.1)',
                     '--bs-pagination-hover-bg': 'rgba(59, 130, 246, 0.3)',
                     '--bs-pagination-hover-border-color': 'rgba(59, 130, 246, 0.5)',
@@ -418,7 +486,7 @@ const DashboardPage = () => {
                     '--bs-pagination-focus-color': 'rgba(255, 255, 255, 1)',
                     '--bs-pagination-active-color': 'rgba(255, 255, 255, 1)',
                     '--bs-pagination-disabled-color': 'rgba(255, 255, 255, 0.4)',
-                    '--bs-pagination-disabled-bg': 'rgba(31, 41, 55, 0.3)',
+                    '--bs-pagination-disabled-bg': 'rgba(30, 41, 59, 0.5)',
                     '--bs-pagination-disabled-border-color': 'rgba(255, 255, 255, 0.05)',
                     borderRadius: '10px',
                     overflow: 'hidden',

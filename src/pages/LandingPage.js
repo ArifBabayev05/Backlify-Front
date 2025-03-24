@@ -354,7 +354,7 @@ const LandingPage = () => {
             borderRadius: '50%',
           }}></div>
           <p className="text-white-50 small m-0">
-            &copy; {new Date().getFullYear()} Database Schema Generator - Powered by AI
+            &copy; {new Date().getFullYear()} API Generator AI
           </p>
         </div>
       </motion.footer>
