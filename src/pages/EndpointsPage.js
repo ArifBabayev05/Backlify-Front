@@ -301,28 +301,51 @@ const EndpointsPage = () => {
     }
     
     try {
-      // Construct the URL for the related table
-      const url = `${apiBaseUrl}/${table}`;
+      // Create URL with limit parameter
+      let url = `${apiBaseUrl}/${table}?limit=100`;
       
-      console.log(`Loading related table data from ${url} (Skip Auth: ${skipAuth})`);
+      // Add skipAuth parameter if needed
+      // if (skipAuth) {
+      //   url += '&skipAuth=true';
+      // }
+      
+      console.log(`Loading related data for ${table} from: ${url} with skipAuth=${skipAuth}`);
       
       const response = await fetchWithAuth(url);
       
       if (!response.ok) {
-        console.error(`Error loading related table data: ${response.status} - ${response.statusText}`);
+        console.error(`Error loading related data for ${table}: ${response.status} ${response.statusText}`);
+        // Try the original table name as fallback
+        if (table !== table) {
+          console.log(`Trying original table name: ${table}`);
+          const fallbackUrl = `${apiBaseUrl}/${table}?limit=100`;
+          const fallbackResponse = await fetch(fallbackUrl);
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            console.log(`Fallback request succeeded for ${table}:`, fallbackData);
+            if (Array.isArray(fallbackData?.data)) {
+              return fallbackData.data;
+            } else if (Array.isArray(fallbackData)) {
+              return fallbackData;
+            }
+          }
+        }
         return [];
       }
       
       const data = await response.json();
       
-      // If data is an array, use it directly, otherwise look for records property
-      const records = Array.isArray(data) ? data : (data.records || []);
+      console.log(`Received data from ${table}:`, data);
       
-      console.log(`Loaded ${records.length} records from ${table}`);
+      if (Array.isArray(data?.data)) {
+        return data.data;
+      } else if (Array.isArray(data)) {
+        return data;
+      }
       
-      return records;
+      return [];
     } catch (error) {
-      console.error(`Error loading related table data for ${table}:`, error);
+      console.error(`Error loading related data for ${table}:`, error);
       return [];
     }
   };
@@ -679,33 +702,40 @@ const EndpointsPage = () => {
 
   // Update the loadTableData function to use fetchWithAuth
   const loadTableData = async (table, page = 1, limit = 10) => {
-    if (!table) {
-      console.error('Cannot load table data: table name is required');
+    if (!apiId || !table) {
+      console.error('Missing apiId or table name for loading data');
       return;
     }
+
+    setIsLoading(true);
+    setError(null); // Clear any previous errors
     
     try {
-      setIsLoading(true);
+      console.log(`Loading data for ${table}, page ${page}, limit ${limit}`);
       
-      // Construct the API URL
-      const url = `${apiBaseUrl}/${table}?page=${page}&limit=${limit}`;
+      // Create URL with pagination parameters
+      let url = `${apiBaseUrl}/${table}?page=${page}&limit=${limit}`;
       
-      console.log(`Loading table data from ${url} (Skip Auth: ${skipAuth})`);
+      // Add skipAuth parameter if needed
+      if (skipAuth) {
+        url += '&skipAuth=true';
+      }
+      
+      console.log(`Fetching from URL: ${url} with skipAuth=${skipAuth}`);
       
       const response = await fetchWithAuth(url);
       
       if (!response.ok) {
-        console.error(`Error loading table data: ${response.status} - ${response.statusText}`);
-        
-        if (response.status === 401 || response.status === 403) {
-          toast.error('Authentication error. Please login again.');
+        // Don't throw for 401/403 since we already tried to refresh the token
+        if (response.status !== 401 && response.status !== 403) {
+          throw new Error(`Failed to load ${table} data: ${response.status} ${response.statusText}`);
         } else {
-          toast.error(`Failed to load table data: ${response.statusText}`);
+          console.warn(`Authentication issue when loading ${table} data, silent handling...`);
+          // Return early without showing error to user
+          setTableData([]);
+          setIsLoading(false);
+          return;
         }
-        
-        setTableData([]);
-        setIsLoading(false);
-        return;
       }
       
       const responseText = await response.text();
@@ -716,7 +746,7 @@ const EndpointsPage = () => {
         console.log(`${table} data loaded:`, data);
       } catch (error) {
         console.error('Error parsing response:', error, 'Raw response:', responseText);
-        //throw new Error('Invalid response format');
+        throw new Error('Invalid response format');
       }
       
       if (data && data.data) {
@@ -760,31 +790,50 @@ const EndpointsPage = () => {
 
   const loadUsersData = async () => {
     if (!apiBaseUrl) {
-      console.warn('Cannot load users data: missing API base URL');
+      console.log('Cannot load users data: missing API base URL');
       return;
     }
     
     try {
-      // Construct the URL for the users endpoint
-      const url = `${apiBaseUrl}/users`;
+      // Create URL with limit parameter
+      let url = `${apiBaseUrl}/users?limit=100`;
       
-      console.log(`Loading users data from ${url} (Skip Auth: ${skipAuth})`);
+      // Add skipAuth parameter if needed
+      if (skipAuth) {
+        url += '&skipAuth=true';
+      }
+      
+      console.log(`Loading users data from: ${url} with skipAuth=${skipAuth}`);
       
       const response = await fetchWithAuth(url);
       
-      if (!response.ok) {
-        console.error(`Error loading users data: ${response.status} - ${response.statusText}`);
-        return [];
+      if (!response.ok && response.status !== 401 && response.status !== 403) {
+        console.error(`Error loading users data: ${response.status} ${response.statusText}`);
+        return;
       }
       
-      const data = await response.json();
+      const responseText = await response.text();
       
-      console.log('Users data loaded:', data);
-      
-      return data.records || data;
+      try {
+        // Try to parse the response as JSON
+        const data = JSON.parse(responseText);
+        console.log(`Received users data:`, data);
+        
+        if (Array.isArray(data?.data)) {
+          setUserData(data.data);
+        } else if (Array.isArray(data)) {
+          setUserData(data);
+        } else {
+          console.warn(`Unexpected data format for users:`, data);
+          setUserData([]);
+        }
+      } catch (parseError) {
+        console.error(`Error parsing response for users:`, parseError);
+        console.log(`Raw response:`, responseText);
+      }
     } catch (error) {
-      console.error('Error loading users data:', error);
-      return [];
+      console.error(`Error loading users data:`, error);
+      // Don't show errors to the user for auth issues
     }
   };
 
@@ -801,9 +850,10 @@ const EndpointsPage = () => {
   // Utility function to handle authenticated fetches with automatic token refresh
   const fetchWithAuth = async (url, options = {}) => {
     try {
-      // Don't add skipAuth as a query parameter, only use the header
-      // Adding it as a query parameter causes database errors
-      const finalUrl = url;
+      // Add skipAuth query parameter if enabled
+      const finalUrl = skipAuth ? 
+        (url.includes('?') ? `${url}&skipAuth=true` : `${url}?skipAuth=true`) : 
+        url;
       
       // Get auth headers and merge with any provided headers
       const headers = {
@@ -1829,11 +1879,10 @@ const EndpointsPage = () => {
       // Return a default example if endpoint is undefined
       return `curl -X GET "http://localhost:3000/api/your-api-id/your-endpoint" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"`;
+  -H "Authorization: Bearer ${getAccessToken() || 'YOUR_BEARER_TOKEN'}"`;
     }
     
-    // Get the actual token if available
-    const token = getAccessToken() || 'YOUR_ACCESS_TOKEN';
+    const token = getAccessToken() || 'YOUR_BEARER_TOKEN';
     
     // Handle the case where fullPath might be undefined
     let url = '';
@@ -1846,7 +1895,10 @@ const EndpointsPage = () => {
       url = 'http://localhost:3000/api/your-api-id/your-endpoint';
     }
     
-    // Don't add skipAuth parameter to URL, only use the header
+    // Add skipAuth parameter if enabled
+    if (skipAuth && !url.includes('skipAuth=true')) {
+      url = url.includes('?') ? `${url}&skipAuth=true` : `${url}?skipAuth=true`;
+    }
     
     let method = endpoint.method || 'GET';
     let curlCmd = `curl -X ${method} "${url}"`;
@@ -3129,7 +3181,7 @@ const EndpointsPage = () => {
         <Modal.Header closeButton className="border-bottom bg-dark text-white">
           <Modal.Title>
             <i className="bi bi-code-slash me-2"></i>
-            API Request Example {skipAuth ? "without Authentication" : "with Authentication"}
+            API Request Example with Authentication
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="bg-dark text-white">
@@ -3143,17 +3195,10 @@ const EndpointsPage = () => {
                   {selectedEndpoint.path || '/api/endpoint'}
                 </h6>
                 <p className="text-light mb-1">{selectedEndpoint.description || 'API endpoint'}</p>
-                {!skipAuth ? (
-                  <p className="text-muted small mb-0">
-                    <i className="bi bi-info-circle me-1"></i>
-                    All requests to the API require authentication headers
-                  </p>
-                ) : (
-                  <p className="text-warning small mb-0">
-                    <i className="bi bi-exclamation-triangle me-1"></i>
-                    Authentication is currently disabled for API requests
-                  </p>
-                )}
+                <p className="text-muted small mb-0">
+                  <i className="bi bi-info-circle me-1"></i>
+                  All requests to the API require authentication headers
+                </p>
               </div>
               
               <div className="mb-4">
@@ -3173,14 +3218,11 @@ const EndpointsPage = () => {
               <div className="mb-4">
                 <h6 className="text-light mb-2">
                   <i className="bi bi-key me-1"></i>
-                  {skipAuth ? "Headers" : "Required Headers"}
+                  Required Headers
                 </h6>
                 <div className="bg-black p-3 rounded mb-2">
                   <pre className="text-info mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-{skipAuth ? 
-`Content-Type: application/json
-X-Skip-Auth: true` :
-`Content-Type: application/json
+{`Content-Type: application/json
 Authorization: Bearer ${getAccessToken() || 'YOUR_ACCESS_TOKEN'}`}
                   </pre>
                 </div>
@@ -3246,6 +3288,7 @@ Authorization: Bearer ${getAccessToken() || 'YOUR_ACCESS_TOKEN'}`}
                   <li>Your requests will use the "anonymous" user identity</li>
                   <li>Anyone with access to your API endpoints can use them</li>
                   <li>You may expose sensitive data or operations</li>
+                  <li>The <code>?skipAuth=true</code> parameter or <code>X-Skip-Auth: true</code> header will be added to requests</li>
                 </ul>
               </div>
             </div>
