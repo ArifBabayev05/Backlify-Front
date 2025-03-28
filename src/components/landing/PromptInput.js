@@ -7,6 +7,7 @@ import LoadingAnimation from '../common/LoadingAnimation';
 import SpinnerLoading from '../common/SpinnerLoading';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { apiRequest } from '../../utils/apiService';
 
 const examplePrompts = [
   "E-commerce database with products, customers, orders, and reviews",
@@ -41,23 +42,14 @@ const PromptInput = ({ onGenerate }) => {
       // Store prompt in sessionStorage first
       sessionStorage.setItem('userPrompt', prompt);
       
-      // API call to generate schema
-      const response = await fetch('http://localhost:3000/generate-schema', {
+      // API call to generate schema using apiRequest
+      const data = await apiRequest('/generate-schema', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
-          prompt: prompt,
-          XAuthUserId: user ? user.XAuthUserId : 'guest'
-        }),
+          prompt: prompt
+        })
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to generate schema: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
       console.log('Received API response:', data);
       
       // Ensure data has the right structure
@@ -175,7 +167,7 @@ const PromptInput = ({ onGenerate }) => {
                 rows={5}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Enter your database requirements and we'll generate an optimized schema"
+                placeholder="Describe your backend needs, and AI will generate the perfect database & API."
                 className="bg-transparent text-white border-0 p-3 prompt-textarea"
                 style={{
                   fontSize: '1rem',

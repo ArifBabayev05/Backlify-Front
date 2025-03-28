@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../components/auth/AuthContext';
+import { loginUser } from '../../utils/apiService';
 
 const LoginPage = () => {
   const [credentials, setCredentials] = useState({
@@ -55,24 +56,16 @@ const LoginPage = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3000/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+      // Use the apiService instead of direct fetch
+      const data = await loginUser(credentials);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || 'Authentication failed');
-      }
-
-      // Store user data using auth context
+      // Store user data with tokens using auth context
+      // The XAuthUserId from the server response is the username
       login({
-        XAuthUserId: data.XAuthUserId,
-        email: data.email
+        XAuthUserId: data.XAuthUserId || credentials.username, // Fallback to form username if needed
+        email: data.email,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken
       });
 
       toast.success('Login successful!');

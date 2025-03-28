@@ -72,7 +72,7 @@ const NavBar = () => {
                     className="nav-link text-white"
                     style={{ textDecoration: 'none' }}
                   >
-                    {user?.XAuthUserId || 'Account'}
+                    {user?.username || 'Account'}
                   </Dropdown.Toggle>
 
                   <Dropdown.Menu style={{ 

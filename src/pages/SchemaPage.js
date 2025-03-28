@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import SchemaFlow from '../components/schema/SchemaFlow';
 import LoadingAnimation from '../components/common/LoadingAnimation';
 import '../components/schema/SchemaLayout.css';
+import { apiRequest } from '../utils/apiService';
 
 
 const SchemaPage = () => {
@@ -199,13 +200,15 @@ const SchemaPage = () => {
     const updatedSchema = {
       tables: updatedNodes.map(node => ({
         name: node.data.tableName,
-        columns: node.data.fields.map(field => ({
-          name: field.name,
-          type: field.type,
-          isPrimary: field.isPrimary,
-          isForeign: field.isForeign,
-          constraints: field.constraints || []
-        }))
+        columns: node.data.fields
+          .filter(field => field.name !== 'XAuthUserId') // Filter out XAuthUserId field
+          .map(field => ({
+            name: field.name,
+            type: field.type,
+            isPrimary: field.isPrimary,
+            isForeign: field.isForeign,
+            constraints: field.constraints || []
+          }))
       })),
       relationships: updatedEdges.map(edge => ({
         source: edge.source,
@@ -305,32 +308,19 @@ const SchemaPage = () => {
       const schemaData = JSON.parse(schemaDataString);
       console.log('Schema data for API generation:', schemaData);
       
-      // Make sure we have a XAuthUserId
-      console.log('Schema data:', schemaData);
-      const XAuthUserId = schemaData.XAuthUserId || 'default';
-      
       const payload = {
-        tables: schemaData.tables,
-        XAuthUserId: XAuthUserId
+        tables: schemaData.tables
+        // XAuthUserId is automatically added in the header by apiService
       };
       
       console.log('Sending API generation request:', payload);
       
-      // 5. Make the API call
-      const response = await fetch('http://localhost:3000/create-api-from-schema', {
+      // 5. Make the API call using apiRequest for authentication
+      const responseData = await apiRequest('/create-api-from-schema', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': payload.XAuthUserId
-        },
         body: JSON.stringify(payload)
       });
       
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-      
-      const responseData = await response.json();
       console.log('Received API generation response:', responseData);
       
       if (!responseData.success) {
@@ -456,11 +446,10 @@ const SchemaPage = () => {
       
       const schemaData = JSON.parse(schemaDataString);
       
-      // Prepare the request payload
+      // Prepare the request payload - no need to include XAuthUserId
       const payload = {
         prompt: currentMessage,
-        tables: schemaData.tables,
-        XAuthUserId: 'User'
+        tables: schemaData.tables
       };
       
       console.log('Sending schema modification request:', payload);
@@ -469,20 +458,12 @@ const SchemaPage = () => {
       setIsLoading(true);
       setApiDataReceived(false);
       
-      // Send the request to the API
-      const response = await fetch('http://localhost:3000/modify-schema', {
+      // Send the request to the API using apiRequest
+      const responseData = await apiRequest('/modify-schema', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(payload)
       });
       
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-      
-      const responseData = await response.json();
       console.log('Received schema modification response:', responseData);
       
       if (!responseData.success) {

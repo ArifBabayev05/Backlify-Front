@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Container, Row, Col, Button, Nav, Form, Modal, Alert, Spinner, Table, Badge, Card, Tooltip, OverlayTrigger } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import LoadingAnimation from '../components/common/LoadingAnimation';
+import { getXAuthUserId } from '../utils/apiService';
+import { apiRequest, getAccessToken, refreshAccessToken } from '../utils/apiService';
+import { useAuth } from '../components/auth/AuthContext';
+import { toast } from 'react-hot-toast';
+import { FaServer, FaLock, FaArrowLeft, FaExclamationTriangle } from 'react-icons/fa';
 
 // Method colors for visual differentiation
 const methodColors = {
@@ -44,11 +49,13 @@ const EndpointsPage = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [swaggerUrl, setSwaggerUrl] = useState('');
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // CRUD operation states
   const [selectedEndpoint, setSelectedEndpoint] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); // create, read, update, delete
+  const [showCurlModal, setShowCurlModal] = useState(false);
+  const [modalMode, setModalMode] = useState('read');
   const [formData, setFormData] = useState({});
   const [resourceId, setResourceId] = useState('');
   const [operationResult, setOperationResult] = useState({ show: false, success: false, message: '', data: null });
@@ -65,6 +72,8 @@ const EndpointsPage = () => {
   const [completeSchemaInfo, setCompleteSchemaInfo] = useState(null);
   // Add error state to the component's state variables
   const [error, setError] = useState(null);
+  const [skipAuth, setSkipAuth] = useState(false);
+  const [showSkipAuthWarning, setShowSkipAuthWarning] = useState(false);
   
   // Format conversion helpers
   const defaultValueForType = (type) => {
@@ -286,114 +295,34 @@ const EndpointsPage = () => {
 
   // Load related table data for dropdowns
   const loadRelatedTableData = async (table) => {
-    if (!table || !apiBaseUrl) {
-      console.log('Cannot load related table data: missing table or API base URL');
+    if (!apiBaseUrl) {
+      console.log(`Cannot load related table data for ${table}: missing API base URL`);
       return [];
     }
     
-    console.log(`Loading related table data for: ${table}`);
-    
-    // First check if this table exists in the completeSchemaInfo
-    let tableName = table;
-    let tableExists = false;
-    
-    if (completeSchemaInfo) {
-      // Try to find the exact table name
-      const exactMatch = completeSchemaInfo.find(t => t.name === table);
-      if (exactMatch) {
-        tableName = exactMatch.name;
-        tableExists = true;
-        console.log(`Found exact match for table ${table} in schema`);
-      } else {
-        // Try plural form
-        const pluralMatch = completeSchemaInfo.find(t => t.name === `${table}s`);
-        if (pluralMatch) {
-          tableName = pluralMatch.name;
-          tableExists = true;
-          console.log(`Found plural match for table ${table} -> ${tableName}`);
-        } else {
-          // Try replacing 'y' with 'ies' for tables like 'category' -> 'categories'
-          const irregularMatch = completeSchemaInfo.find(t => 
-            t.name === table.replace(/y$/, 'ies')
-          );
-          if (irregularMatch) {
-            tableName = irregularMatch.name;
-            tableExists = true;
-            console.log(`Found irregular plural match for table ${table} -> ${tableName}`);
-          }
-        }
-      }
-    }
-    
-    // If we didn't find it in the schema, use fallback rules
-    if (!tableExists) {
-      // Special case mappings
-      const tableNameMappings = {
-        'city': 'cities',
-        'country': 'countries',
-        'category': 'categories',
-        'property': 'properties'
-      };
-      
-      // Check if we need to adjust the table name
-      if (tableNameMappings[tableName]) {
-        tableName = tableNameMappings[tableName];
-        console.log(`Adjusted table name from ${table} to ${tableName}`);
-      }
-      
-      // Single-letter table names should not be pluralized
-      const isSingleLetterTable = /^[a-z]$/i.test(tableName);
-      
-      // Also handle common singular/plural conversions, but only if not a single letter table
-      if (!isSingleLetterTable && !tableName.endsWith('s') && !Object.values(tableNameMappings).includes(tableName)) {
-        // Most tables are named in plural form
-        tableName = tableName + 's';
-        console.log(`Adding plural 's' to get table name: ${tableName}`);
-      }
-      
-      // Special handling for tables with irregular plurals not covered above
-      if (tableName === 'persons') tableName = 'people';
-    }
-    
     try {
-      const url = `${apiBaseUrl}/${tableName}?limit=100`;
-      console.log(`Loading related table data from: ${url}`);
+      // Construct the URL for the related table
+      const url = `${apiBaseUrl}/${table}`;
       
-      const response = await fetch(url);
+      console.log(`Loading related table data from ${url} (Skip Auth: ${skipAuth})`);
+      
+      const response = await fetchWithAuth(url);
       
       if (!response.ok) {
-        console.error(`Error loading related data for ${tableName}: ${response.status} ${response.statusText}`);
-        // Try the original table name as fallback
-        if (tableName !== table) {
-          console.log(`Trying original table name: ${table}`);
-          const fallbackUrl = `${apiBaseUrl}/${table}?limit=100`;
-          const fallbackResponse = await fetch(fallbackUrl);
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json();
-            console.log(`Fallback request succeeded for ${table}:`, fallbackData);
-            if (Array.isArray(fallbackData?.data)) {
-              return fallbackData.data;
-            } else if (Array.isArray(fallbackData)) {
-              return fallbackData;
-            }
-          }
-        }
+        console.error(`Error loading related table data: ${response.status} - ${response.statusText}`);
         return [];
       }
       
       const data = await response.json();
       
-      console.log(`Received data from ${tableName}:`, data);
+      // If data is an array, use it directly, otherwise look for records property
+      const records = Array.isArray(data) ? data : (data.records || []);
       
-      if (Array.isArray(data?.data)) {
-        return data.data;
-      } else if (Array.isArray(data)) {
-        return data;
-      }
+      console.log(`Loaded ${records.length} records from ${table}`);
       
-      return [];
+      return records;
     } catch (error) {
-      console.error(`Error loading related data for ${tableName}:`, error);
+      console.error(`Error loading related table data for ${table}:`, error);
       return [];
     }
   };
@@ -443,31 +372,11 @@ const EndpointsPage = () => {
     setIsLoading(true);
     
     try {
-      // Fetch the user's ID from sessionStorage first, then fallback to localStorage
-      const userIdFromSession = sessionStorage.getItem('XAuthUserId');
-      const XAuthUserId = userIdFromSession || localStorage.getItem('XAuthUserId');
-      
-      if (!XAuthUserId) {
-        throw new Error('User not authenticated');
-      }
-      
-      // Update the XAuthUserId state
-      setUserId(XAuthUserId);
-      
-      // Make a request to your backend to get the API details
-      const response = await fetch('http://localhost:3000/my-apis', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': XAuthUserId
-        }
+      // Use apiRequest to include authorization header
+      const data = await apiRequest('/my-apis', {
+        method: 'GET'
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch API details');
-      }
-      
-      const data = await response.json();
       console.log('API data received:', data);
       
       const selectedApi = data.apis.find(api => api.apiId === apiId);
@@ -477,6 +386,12 @@ const EndpointsPage = () => {
       }
       
       console.log('Selected API:', selectedApi);
+      
+      // Get auth headers for constructing the endpoint URLs
+      const token = getAccessToken();
+      const authHeadersInfo = token ? `(With Auth Header)` : '';
+      const skipAuthParam = skipAuth ? '?skipAuth=true' : '';
+      const authStatus = skipAuth ? 'No Auth' : 'Auth Required';
       
       // Initialize endpoints based on the tables in the API
       const transformedEndpoints = selectedApi.tables.map(table => {
@@ -489,36 +404,36 @@ const EndpointsPage = () => {
               method: 'GET',
               path: `/${table}`,
               description: `List all ${table}`,
-              auth: false,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}`
+              auth: !skipAuth,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}${skipAuthParam} (${authStatus})`
             },
             {
               method: 'GET',
               path: `/${table}/:id`,
               description: `Get a single ${table} by ID`,
-              auth: false,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id`
+              auth: !skipAuth,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id${skipAuthParam} (${authStatus})`
             },
             {
               method: 'POST',
               path: `/${table}`,
               description: `Create a new ${table}`,
-              auth: true,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}`
+              auth: !skipAuth,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}${skipAuthParam} (${authStatus})`
             },
             {
               method: 'PUT',
               path: `/${table}/:id`,
               description: `Update an existing ${table}`,
-              auth: true,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id`
+              auth: !skipAuth,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id${skipAuthParam} (${authStatus})`
             },
             {
               method: 'DELETE',
               path: `/${table}/:id`,
               description: `Delete a ${table}`,
-              auth: true,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id`
+              auth: !skipAuth,
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id${skipAuthParam} (${authStatus})`
             }
           ]
         };
@@ -762,25 +677,35 @@ const EndpointsPage = () => {
     }
   }, [selectedTable, apiBaseUrl]);
 
-  // Update the loadTableData function to add error handling
+  // Update the loadTableData function to use fetchWithAuth
   const loadTableData = async (table, page = 1, limit = 10) => {
-    if (!apiId || !table) {
-      console.error('Missing apiId or table name for loading data');
-      //setError('Missing API ID or table name');
+    if (!table) {
+      console.error('Cannot load table data: table name is required');
       return;
     }
-
-    setIsLoading(true);
+    
     try {
-      console.log(`Loading data for ${table}, page ${page}, limit ${limit}`);
+      setIsLoading(true);
       
+      // Construct the API URL
       const url = `${apiBaseUrl}/${table}?page=${page}&limit=${limit}`;
-      console.log('Fetching from URL:', url);
       
-      const response = await fetch(url);
+      console.log(`Loading table data from ${url} (Skip Auth: ${skipAuth})`);
+      
+      const response = await fetchWithAuth(url);
       
       if (!response.ok) {
-        throw new Error(`Failed to load ${table} data: ${response.status} ${response.statusText}`);
+        console.error(`Error loading table data: ${response.status} - ${response.statusText}`);
+        
+        if (response.status === 401 || response.status === 403) {
+          toast.error('Authentication error. Please login again.');
+        } else {
+          toast.error(`Failed to load table data: ${response.statusText}`);
+        }
+        
+        setTableData([]);
+        setIsLoading(false);
+        return;
       }
       
       const responseText = await response.text();
@@ -791,7 +716,7 @@ const EndpointsPage = () => {
         console.log(`${table} data loaded:`, data);
       } catch (error) {
         console.error('Error parsing response:', error, 'Raw response:', responseText);
-        throw new Error('Invalid response format');
+        //throw new Error('Invalid response format');
       }
       
       if (data && data.data) {
@@ -823,7 +748,10 @@ const EndpointsPage = () => {
       }
     } catch (error) {
       console.error(`Error loading ${table} data:`, error);
-      setError(`Error loading ${table} data: ${error.message}`);
+      // Only set the error message for non-401/403 errors
+      if (error.message.indexOf('401') === -1 && error.message.indexOf('403') === -1) {
+        setError(`Error loading ${table} data: ${error.message}`);
+      }
       setTableData([]);
     } finally {
       setIsLoading(false);
@@ -832,36 +760,31 @@ const EndpointsPage = () => {
 
   const loadUsersData = async () => {
     if (!apiBaseUrl) {
-      console.log('Cannot load users data: missing API base URL');
+      console.warn('Cannot load users data: missing API base URL');
       return;
     }
     
     try {
-      const url = `${apiBaseUrl}/users?limit=100`;
-      console.log(`Loading users data from: ${url}`);
+      // Construct the URL for the users endpoint
+      const url = `${apiBaseUrl}/users`;
       
-      const response = await fetch(url);
-      const responseText = await response.text();
+      console.log(`Loading users data from ${url} (Skip Auth: ${skipAuth})`);
       
-      try {
-        // Try to parse the response as JSON
-        const data = JSON.parse(responseText);
-        console.log(`Received users data:`, data);
-        
-        if (Array.isArray(data?.data)) {
-          setUserData(data.data);
-        } else if (Array.isArray(data)) {
-          setUserData(data);
-        } else {
-          console.warn(`Unexpected data format for users:`, data);
-          setUserData([]);
-        }
-      } catch (parseError) {
-        console.error(`Error parsing response for users:`, parseError);
-        console.log(`Raw response:`, responseText);
+      const response = await fetchWithAuth(url);
+      
+      if (!response.ok) {
+        console.error(`Error loading users data: ${response.status} - ${response.statusText}`);
+        return [];
       }
+      
+      const data = await response.json();
+      
+      console.log('Users data loaded:', data);
+      
+      return data.records || data;
     } catch (error) {
-      console.error(`Error loading users data:`, error);
+      console.error('Error loading users data:', error);
+      return [];
     }
   };
 
@@ -875,14 +798,101 @@ const EndpointsPage = () => {
     navigate('/schema');
   };
 
+  // Utility function to handle authenticated fetches with automatic token refresh
+  const fetchWithAuth = async (url, options = {}) => {
+    try {
+      // Don't add skipAuth as a query parameter, only use the header
+      // Adding it as a query parameter causes database errors
+      const finalUrl = url;
+      
+      // Get auth headers and merge with any provided headers
+      const headers = {
+        ...getAuthHeaders(),
+        ...options.headers
+      };
+      
+      // Add X-Skip-Auth header if skipAuth is enabled
+      if (skipAuth) {
+        headers['X-Skip-Auth'] = 'true';
+      }
+      
+      // Create the initial request config
+      const config = {
+        ...options,
+        headers
+      };
+      
+      console.log(`Making ${skipAuth ? 'non-authenticated' : 'authenticated'} request to: ${finalUrl}`);
+      
+      // Make the first request
+      let response = await fetch(finalUrl, config);
+      
+      // If skipAuth is enabled, don't attempt token refresh
+      if (!skipAuth && (response.status === 401 || response.status === 403)) {
+        try {
+          console.log('Token expired, attempting refresh...');
+          // Try to refresh the token
+          await refreshAccessToken();
+          
+          // Get new headers with the refreshed token
+          const newHeaders = {
+            ...getAuthHeaders(),
+            ...options.headers
+          };
+          
+          // Add X-Skip-Auth header if skipAuth is enabled
+          if (skipAuth) {
+            newHeaders['X-Skip-Auth'] = 'true';
+          }
+          
+          // Create a new config with the updated headers
+          const newConfig = {
+            ...options,
+            headers: newHeaders
+          };
+          
+          // Retry the request with the new token
+          console.log('Retrying request with new token...');
+          response = await fetch(finalUrl, newConfig);
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          // We don't throw here - we'll continue and let the caller handle the response
+        }
+      }
+      
+      // Return the response object so the caller can handle it
+      return response;
+    } catch (error) {
+      console.error(`API request error (${url}):`, error);
+      throw error;
+    }
+  };
+
+  // Utility function to get auth headers with bearer token
+  const getAuthHeaders = () => {
+    const token = getAccessToken();
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    // Get the user ID from session storage
+    const userIdFromSession = sessionStorage.getItem('XAuthUserId');
+    if (userIdFromSession) {
+      headers['XAuthUserId'] = userIdFromSession;
+    }
+    
+    return headers;
+  };
+
   // Function to check if the API endpoint is ready
   const checkApiReady = async (url) => {
     try {
       console.log(`Testing API endpoint: ${url}`);
-      const response = await fetch(url, { 
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const response = await fetchWithAuth(url, { method: 'GET' });
       
       // If we get any response, even an error, the API is at least running
       if (response) {
@@ -979,6 +989,12 @@ const EndpointsPage = () => {
       console.error('Cannot open modal: missing endpoint information');
       return;
     }
+    
+    // Ensure endpoint has all required properties
+    endpoint = {
+      table: endpoint.table || '',
+      ...endpoint
+    };
     
     console.log(`Opening modal for ${mode} operation on table ${endpoint.table}`, { endpoint, record });
     
@@ -1328,16 +1344,20 @@ const EndpointsPage = () => {
     return 'text';
   };
 
-  // Add a function to ensure XAuthUserId is set correctly in form data
+  // Function to check if a field should be hidden in the UI
+  const shouldHideField = (fieldName) => {
+    // Hide XAuthUserId field
+    return fieldName === 'XAuthUserId';
+  };
+
+  // Ensure XAuthUserId is included in the form data when needed
   const ensureUserIdInFormData = (data) => {
-    const userIdFromSession = sessionStorage.getItem('XAuthUserId');
-    const currentUserId = userIdFromSession || XAuthUserId;
-    
-    if (!data.XAuthUserId && currentUserId) {
-      return { ...data, XAuthUserId: currentUserId };
+    const result = { ...data };
+    // If XAuthUserId doesn't exist in the data, add it from the apiService
+    if (!result.XAuthUserId) {
+      result.XAuthUserId = getXAuthUserId(); // Use the XAuthUserId from apiService
     }
-    
-    return data;
+    return result;
   };
 
   const handleSubmit = async (e) => {
@@ -1363,51 +1383,27 @@ const EndpointsPage = () => {
       
       console.log(`Submitting ${modalMode} request to:`, requestUrl);
       
-      // Get the latest user ID from sessionStorage
-      const userIdFromSession = sessionStorage.getItem('XAuthUserId') || XAuthUserId;
-      
       // Configure the request based on the operation
       let requestConfig = {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: modalMode === 'create' ? 'POST' : 
+                modalMode === 'update' ? 'PUT' : 
+                modalMode === 'delete' ? 'DELETE' : 'GET'
       };
       
-      // Set the appropriate HTTP method based on the operation
-      switch (modalMode) {
-        case 'create':
-          requestConfig.method = 'POST';
-          // Make sure the formData has the XAuthUserId included
-          {
-            const formDataWithUserId = ensureUserIdInFormData(formData);
-            requestConfig.body = JSON.stringify(formDataWithUserId);
-          }
-          break;
-        case 'update':
-          requestConfig.method = 'PUT';
-          // Make sure the formData has the XAuthUserId included
-          {
-            const formDataWithUserId = ensureUserIdInFormData(formData);
-            requestConfig.body = JSON.stringify(formDataWithUserId);
-          }
-          break;
-        case 'delete':
-          requestConfig.method = 'DELETE';
-          break;
-        default: // 'read'
-          // GET method already set as default
-          break;
+      // Add body for POST and PUT requests
+      if (modalMode === 'create' || modalMode === 'update') {
+        // Make sure the formData has the XAuthUserId included
+        const formDataWithUserId = ensureUserIdInFormData(formData);
+        requestConfig.body = JSON.stringify(formDataWithUserId);
       }
       
       console.log('Request config:', {
         method: requestConfig.method,
         url: requestUrl,
-        headers: requestConfig.headers,
         bodyPreview: requestConfig.body ? requestConfig.body.substring(0, 200) + '...' : 'No body'
       });
       
-      const response = await fetch(requestUrl, requestConfig);
+      const response = await fetchWithAuth(requestUrl, requestConfig);
       
       // First get the response as text to handle empty responses
       const responseText = await response.text();
@@ -1462,42 +1458,69 @@ const EndpointsPage = () => {
           setShowModal(false);
         }
       } else {
-        // Error handling
-        let errorMessage = 'Operation failed';
-        
-        if (responseData && responseData.message) {
-          errorMessage = responseData.message;
-        } else if (responseData && responseData.error) {
-          errorMessage = responseData.error;
+        // Handle auth errors silently
+        if (response.status === 401 || response.status === 403) {
+          console.warn(`Authentication issue during ${modalMode} operation, handled silently`);
+          // Still set an operation result but don't show auth errors to user
+          setOperationResult({
+            show: true,
+            success: false,
+            message: 'Operation could not be completed',
+            data: null
+          });
         } else {
-          errorMessage = `${modalMode} operation failed: ${response.status} ${response.statusText}`;
+          // Error handling for non-auth errors
+          let errorMessage = 'Operation failed';
+          
+          if (responseData && responseData.message) {
+            errorMessage = responseData.message;
+          } else if (responseData && responseData.error) {
+            errorMessage = responseData.error;
+          } else {
+            errorMessage = `${modalMode} operation failed: ${response.status} ${response.statusText}`;
+          }
+          
+          console.error('API Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: responseData
+          });
+          
+          setOperationResult({
+            show: true,
+            success: false,
+            message: errorMessage,
+            data: responseData
+          });
+          
+          setSubmitError(errorMessage);
         }
-        
-        console.error('API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          data: responseData
-        });
+      }
+    } catch (error) {
+      console.error('Request error:', error);
+      
+      // Don't show authentication errors to the user
+      const isAuthError = error.message.includes('401') || error.message.includes('403') || 
+                         error.message.includes('Authentication') || error.message.includes('token');
+      
+      if (!isAuthError) {
+        setSubmitError(`Error: ${error.message || 'Unknown error occurred'}`);
         
         setOperationResult({
           show: true,
           success: false,
-          message: errorMessage,
-          data: responseData
+          message: `Error: ${error.message || 'Unknown error occurred'}`,
+          data: null
         });
-        
-        setSubmitError(errorMessage);
+      } else {
+        console.warn('Authentication error handled silently');
+        setOperationResult({
+          show: true,
+          success: false,
+          message: 'Operation could not be completed',
+          data: null
+        });
       }
-    } catch (error) {
-      console.error('Request error:', error);
-      setSubmitError(`Error: ${error.message || 'Unknown error occurred'}`);
-      
-      setOperationResult({
-        show: true,
-        success: false,
-        message: `Error: ${error.message || 'Unknown error occurred'}`,
-        data: null
-      });
     } finally {
       setIsLoading(false);
     }
@@ -1575,7 +1598,19 @@ const EndpointsPage = () => {
       }
       
       // Make the request to get data
-      const response = await fetch(url);
+      const response = await fetchWithAuth(url);
+      
+      // Handle 401/403 silently
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.warn(`Authentication issue when fetching schema for ${tableName}, using default schema`);
+          return inferDefaultSchema(tableName);
+        } else {
+          console.error(`Error fetching sample data for ${tableName}:`, response.status, response.statusText);
+          throw new Error(`Failed to fetch sample data: ${response.status} ${response.statusText}`);
+        }
+      }
+      
       const responseText = await response.text();
       
       let data;
@@ -1703,31 +1738,34 @@ const EndpointsPage = () => {
         // Create schema based on the actual table definition
         const schema = {};
         
-        tableDefinition.columns.forEach(column => {
-          const isRequired = column.constraints?.includes('not null');
-          const isPrimary = column.constraints?.includes('primary key');
-          
-          // Determine the type based on database column type
-          let fieldType = 'string';
-          if (column.type === 'uuid' || column.type.includes('int') || column.name.endsWith('_id')) {
-            fieldType = 'id';
-          } else if (column.type === 'timestamp' || column.type === 'timestamptz' || column.type === 'date') {
-            fieldType = 'timestamp';
-          } else if (column.type === 'boolean') {
-            fieldType = 'boolean';
-          } else if (column.type === 'numeric' || column.type === 'decimal' || column.type === 'float') {
-            fieldType = 'number';
-          } else if (column.type === 'text' || column.type.includes('text')) {
-            fieldType = 'longtext';
-          }
-          
-          schema[column.name] = { 
-            type: fieldType, 
-            required: isRequired,
-            primary: isPrimary,
-            constraints: column.constraints || []
-          };
-        });
+        // Filter out XAuthUserId from columns
+        tableDefinition.columns
+          .filter(column => column.name !== 'XAuthUserId')
+          .forEach(column => {
+            const isRequired = column.constraints?.includes('not null');
+            const isPrimary = column.constraints?.includes('primary key');
+            
+            // Determine the type based on database column type
+            let fieldType = 'string';
+            if (column.type === 'uuid' || column.type.includes('int') || column.name.endsWith('_id')) {
+              fieldType = 'id';
+            } else if (column.type === 'timestamp' || column.type === 'timestamptz' || column.type === 'date') {
+              fieldType = 'timestamp';
+            } else if (column.type === 'boolean') {
+              fieldType = 'boolean';
+            } else if (column.type === 'numeric' || column.type === 'decimal' || column.type === 'float') {
+              fieldType = 'number';
+            } else if (column.type === 'text' || column.type.includes('text')) {
+              fieldType = 'longtext';
+            }
+            
+            schema[column.name] = { 
+              type: fieldType, 
+              required: isRequired,
+              primary: isPrimary,
+              constraints: column.constraints || []
+            };
+          });
         
         console.log('Schema created from API definition:', schema);
         
@@ -1744,8 +1782,8 @@ const EndpointsPage = () => {
     // Fallback to creating a default schema if no definition found
     console.log(`No API definition found for ${tableName}, creating default schema`);
     const schema = {
-      id: { type: 'id' },
-      XAuthUserId: { type: 'id' }
+      id: { type: 'id' }
+      // Don't include XAuthUserId in the default schema
     };
     
     // Add timestamp fields that are common
@@ -1785,10 +1823,283 @@ const EndpointsPage = () => {
     return schema;
   };
 
+  // Function to generate a curl example for the endpoint
+  const generateCurlExample = (endpoint) => {
+    if (!endpoint) {
+      // Return a default example if endpoint is undefined
+      return `curl -X GET "http://localhost:3000/api/your-api-id/your-endpoint" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"`;
+    }
+    
+    // Get the actual token if available
+    const token = getAccessToken() || 'YOUR_ACCESS_TOKEN';
+    
+    // Handle the case where fullPath might be undefined
+    let url = '';
+    if (endpoint.fullPath) {
+      // Remove the auth info from the fullPath
+      url = endpoint.fullPath.split(' ')[0]; 
+    } else if (endpoint.table) {
+      url = `http://localhost:3000/api/${apiId || 'your-api-id'}/${endpoint.table}`;
+    } else {
+      url = 'http://localhost:3000/api/your-api-id/your-endpoint';
+    }
+    
+    // Don't add skipAuth parameter to URL, only use the header
+    
+    let method = endpoint.method || 'GET';
+    let curlCmd = `curl -X ${method} "${url}"`;
+    
+    // Add headers
+    curlCmd += ` \\\n  -H "Content-Type: application/json"`;
+    
+    // Only add auth headers if skipAuth is false
+    if (!skipAuth) {
+      curlCmd += ` \\\n  -H "Authorization: Bearer ${token}"`;
+    } else {
+      curlCmd += ` \\\n  -H "X-Skip-Auth: true"`;
+    }
+    
+    // Add body for POST and PUT requests
+    if (method === 'POST' || method === 'PUT') {
+      let sampleBody = {};
+      const uuid = generateUUID();
+      const relatedUuid = generateUUID();
+      const currentDate = new Date().toISOString();
+      
+      if (endpoint.table) {
+        // Generate sample data based on table name
+        switch(endpoint.table.toLowerCase()) {
+          case 'users':
+            sampleBody = {
+              id: uuid,
+              username: "example_user",
+              email: "user@example.com",
+              password: "securepassword",
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'posts':
+            sampleBody = {
+              id: uuid,
+              title: "Sample Post",
+              content: "This is a sample post content.",
+              user_id: relatedUuid,
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'books':
+            sampleBody = {
+              id: uuid,
+              title: "Sample Book",
+              author: "Author Name",
+              isbn: "978-3-16-148410-0",
+              publication_date: "2023-01-15",
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'loans':
+            sampleBody = {
+              id: uuid,
+              book_id: relatedUuid,
+              member_id: generateUUID(),
+              loan_date: currentDate,
+              due_date: new Date(Date.now() + 14*24*60*60*1000).toISOString(), // 2 weeks later
+              return_date: null, // Usually null for a new loan
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'members':
+            sampleBody = {
+              id: uuid,
+              first_name: "John",
+              last_name: "Doe",
+              email: "john.doe@example.com",
+              phone: "123-456-7890",
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'orders':
+            sampleBody = {
+              id: uuid,
+              user_id: relatedUuid,
+              order_date: currentDate,
+              total_amount: 99.99,
+              status: "pending",
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'products':
+            sampleBody = {
+              id: uuid,
+              name: "Sample Product",
+              description: "This is a sample product description",
+              price: 29.99,
+              stock: 100,
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'appointments':
+            sampleBody = {
+              id: uuid,
+              user_id: relatedUuid,
+              doctor_id: generateUUID(),
+              appointment_date: currentDate,
+              notes: "Regular checkup",
+              status: "scheduled",
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          case 'doctors':
+            sampleBody = {
+              id: uuid,
+              first_name: "Dr. Jane",
+              last_name: "Smith",
+              specialization: "Cardiology",
+              license_number: "MED-123456",
+              created_at: currentDate,
+              updated_at: currentDate
+            };
+            break;
+          default:
+            // Try to infer fields from table name or use default
+            if (completeSchemaInfo) {
+              const tableSchema = completeSchemaInfo.find(t => t.name === endpoint.table);
+              if (tableSchema && tableSchema.columns) {
+                tableSchema.columns.forEach(column => {
+                  // Skip XAuthUserId
+                  if (column.name === 'XAuthUserId') return;
+                  
+                  // Set value based on column type
+                  let value;
+                  if (column.name === 'id') {
+                    value = uuid;
+                  } else if (column.name.endsWith('_id')) {
+                    value = relatedUuid;
+                  } else if (column.name.includes('date')) {
+                    value = currentDate;
+                  } else if (column.name.includes('email')) {
+                    value = 'sample@example.com';
+                  } else if (column.name.includes('name')) {
+                    value = 'Sample Name';
+                  } else if (column.type === 'int' || column.type === 'integer') {
+                    value = 1;
+                  } else if (column.type === 'float' || column.type === 'decimal') {
+                    value = 9.99;
+                  } else if (column.type === 'boolean') {
+                    value = true;
+                  } else {
+                    value = `Sample ${column.name.replace(/_/g, ' ')}`;
+                  }
+                  
+                  sampleBody[column.name] = value;
+                });
+              } else {
+                // Default fallback
+                sampleBody = {
+                  id: uuid,
+                  name: "Sample Item",
+                  description: "This is a sample item",
+                  created_at: currentDate,
+                  updated_at: currentDate
+                };
+              }
+            } else {
+              // Default fallback
+              sampleBody = {
+                id: uuid,
+                name: "Sample Item",
+                description: "This is a sample item",
+                created_at: currentDate,
+                updated_at: currentDate
+              };
+            }
+        }
+      }
+      
+      curlCmd += ` \\\n  -d '${JSON.stringify(sampleBody, null, 2)}'`;
+    }
+    
+    return curlCmd;
+  };
+
+  // Function to toggle skipAuth mode
+  const handleToggleSkipAuth = () => {
+    if (!skipAuth) {
+      // If enabling skipAuth, show warning first
+      setShowSkipAuthWarning(true);
+    } else {
+      // If disabling, just set the state
+      setSkipAuth(false);
+    }
+  };
+
+  // Function to confirm skipAuth after warning
+  const confirmSkipAuth = () => {
+    setSkipAuth(true);
+    setShowSkipAuthWarning(false);
+    // Reload endpoints with the new setting
+    if (apiId) {
+      loadApiEndpoints(apiId);
+    }
+  };
+
+  // Function to cancel skipAuth
+  const cancelSkipAuth = () => {
+    setShowSkipAuthWarning(false);
+  };
+
+  // Custom styles for auth toggle
+  const authToggleStyles = `
+    .auth-toggle .form-check-input {
+      cursor: pointer;
+      height: 1.25rem;
+      width: 2.5rem;
+      transition: all 0.2s ease;
+    }
+    
+    .auth-toggle .form-check-input:checked {
+      background-color: #10b981;
+      border-color: #10b981;
+    }
+    
+    .auth-toggle .form-check-input:not(:checked) {
+      background-color: #dc3545;
+      border-color: #dc3545;
+    }
+    
+    .auth-toggle .form-check-input:focus {
+      box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+    }
+    
+    .auth-toggle .form-check-input:not(:checked):focus {
+      box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    }
+    
+    .auth-toggle .form-check-label {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+      padding-left: 0.5rem;
+    }
+  `;
+
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ 
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      height: '100vh', // Set explicit height for main container
+      overflow: 'hidden' // Prevent overall page scrolling
     }}>
+      <style>{authToggleStyles}</style>
       {/* Header */}
       <header className="p-3 d-flex align-items-center justify-content-between" style={{ 
         background: 'rgba(15, 23, 42, 0.8)',
@@ -1809,14 +2120,34 @@ const EndpointsPage = () => {
             API Endpoints
           </h1>
           <div className="small mb-0 mt-1 d-flex align-items-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-            <Badge bg="info" className="me-2" pill style={{ fontSize: '0.65rem', backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>
-              {XAuthUserId || 'Loading...'}
-            </Badge>
+            {/* Remove or comment out the badge showing XAuthUserId */}
             <span>Generated endpoints for your database schema</span>
           </div>
         </motion.div>
         
         <div className="d-flex align-items-center gap-3">
+          {/* Authentication Toggle Section */}
+          <div className="d-flex flex-column gap-1">
+            <div className="d-flex align-items-center gap-2 bg-dark bg-opacity-75 px-3 py-2 rounded-pill">
+              <span className="text-white-50 small">Authentication:</span>
+              <Form.Check
+                type="switch"
+                id="skip-auth-switch"
+                className="auth-toggle"
+                checked={!skipAuth}
+                onChange={handleToggleSkipAuth}
+                label={<span className={skipAuth ? "text-danger" : "text-success"}>{skipAuth ? "Disabled" : "Enabled"}</span>}
+              />
+            </div>
+            {skipAuth && (
+              <div className="small text-danger px-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="me-1">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                API requests will skip authentication
+              </div>
+            )}
+          </div>
           <motion.div 
             whileHover={{ scale: 1.03 }} 
             whileTap={{ scale: 0.97 }}
@@ -1911,7 +2242,7 @@ const EndpointsPage = () => {
       )}
       
       {/* Main Content with Tables and Endpoints */}
-      <div className="flex-grow-1 d-flex">
+      <div className="flex-grow-1 d-flex" style={{ overflow: 'hidden' }}>
         {isLoading ? (
           <div className="d-flex justify-content-center align-items-center w-100 py-5">
             <div className="text-center">
@@ -1945,11 +2276,14 @@ const EndpointsPage = () => {
           <>
             {/* Left Panel - Data View */}
             <motion.div 
-              className="flex-grow-1 p-4" 
-              style={{ borderRight: '1px solid rgba(255, 255, 255, 0.05)' }}
+              className="flex-grow-1 p-4"
               variants={fadeIn}
               initial="hidden"
               animate="visible"
+              style={{ 
+                height: '100%',
+                overflow: 'auto'  // Allow scrolling in the main content area
+              }}
             >
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <div className="d-flex align-items-center">
@@ -2031,11 +2365,13 @@ const EndpointsPage = () => {
                     <Table responsive hover variant="dark" className="mb-0" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                       <thead>
                         <tr style={{ backgroundColor: 'rgba(30, 41, 59, 0.8)' }}>
-                          {Object.keys(tableData[0]).map(key => (
-                            <th key={key} className="py-3 px-4 text-nowrap" style={{ borderBottom: '2px solid rgba(59, 130, 246, 0.3)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                              {key.replace(/_/g, ' ')}
-                            </th>
-                          ))}
+                          {Object.keys(tableData[0])
+                            .filter(key => key !== 'XAuthUserId') // Filter out XAuthUserId from table headers
+                            .map(key => (
+                              <th key={key} className="py-3 px-4 text-nowrap" style={{ borderBottom: '2px solid rgba(59, 130, 246, 0.3)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {key.replace(/_/g, ' ')}
+                              </th>
+                            ))}
                           <th className="text-end py-3 px-4" style={{ borderBottom: '2px solid rgba(59, 130, 246, 0.3)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
                         </tr>
                       </thead>
@@ -2049,13 +2385,15 @@ const EndpointsPage = () => {
                             className="record-row"
                             style={{ transition: 'background-color 0.15s ease' }}
                           >
-                            {Object.entries(record).map(([key, value]) => (
-                              <td key={key} className="py-3 px-4">
-                                {typeof value === 'object' 
-                                  ? JSON.stringify(value).substring(0, 30) + (JSON.stringify(value).length > 30 ? '...' : '')
-                                  : String(value).substring(0, 30) + (String(value).length > 30 ? '...' : '')}
-                              </td>
-                            ))}
+                            {Object.entries(record)
+                              .filter(([key]) => key !== 'XAuthUserId') // Filter out XAuthUserId from table cells
+                              .map(([key, value]) => (
+                                <td key={key} className="py-3 px-4">
+                                  {typeof value === 'object' 
+                                    ? JSON.stringify(value).substring(0, 30) + (JSON.stringify(value).length > 30 ? '...' : '')
+                                    : String(value).substring(0, 30) + (String(value).length > 30 ? '...' : '')}
+                                </td>
+                              ))}
                             <td className="text-end py-3 px-4">
                               <div className="d-flex gap-2 justify-content-end">
                                 <OverlayTrigger
@@ -2218,10 +2556,16 @@ const EndpointsPage = () => {
             <motion.div 
               className="p-4" 
               style={{ 
-                width: '400px', 
+                width: '500px', 
                 borderLeft: '1px solid rgba(255, 255, 255, 0.05)',
                 background: 'rgba(15, 23, 42, 0.4)',
-                backdropFilter: 'blur(8px)'
+                backdropFilter: 'blur(8px)',
+                height: '100%',
+                overflowY: 'auto', // Enable vertical scrolling for this panel
+                overflowX: 'hidden', // Prevent horizontal scrolling
+                position: 'relative',
+                maxHeight: 'calc(100vh - 64px)', // Account for header height
+                paddingBottom: '80px' // Add padding at the bottom for better scrolling
               }}
               variants={slideIn}
               initial="hidden"
@@ -2316,6 +2660,52 @@ const EndpointsPage = () => {
                                 }}>
                                   {endpoint.fullPath}
                                 </code>
+                                
+                                <div className="mt-2 d-flex">
+                                  <Button
+                                    size="sm"
+                                    variant="outline-secondary"
+                                    className="me-2"
+                                    onClick={() => {
+                                      const curlExample = generateCurlExample(endpoint);
+                                      navigator.clipboard.writeText(curlExample);
+                                      toast.success('CURL command copied to clipboard!');
+                                    }}
+                                    style={{ fontSize: '0.7rem' }}
+                                  >
+                                    <i className="bi bi-clipboard me-1"></i> Copy CURL
+                                  </Button>
+                                  
+                                  <OverlayTrigger
+                                    placement="top"
+                                    overlay={
+                                      <Tooltip id={`tooltip-${endpoint.method}-${endpoint.path}`}>
+                                        Remember to include authorization headers!
+                                      </Tooltip>
+                                    }
+                                  >
+                                    <Button
+                                      size="sm"
+                                      variant="outline-info"
+                                      style={{ fontSize: '0.7rem' }}
+                                      onClick={() => {
+                                        // Ensure endpoint has all required properties before showing the modal
+                                        const completeEndpoint = {
+                                          method: endpoint.method || 'GET',
+                                          path: endpoint.path || '',
+                                          table: endpoint.table || endpoint.path?.split('/')[1] || '',
+                                          fullPath: endpoint.fullPath || `http://localhost:3000/api/${apiId}/${endpoint.table || ''}`,
+                                          description: endpoint.description || 'API endpoint',
+                                          ...endpoint
+                                        };
+                                        setSelectedEndpoint(completeEndpoint);
+                                        setShowCurlModal(true);
+                                      }}
+                                    >
+                                      <i className="bi bi-code-slash me-1"></i> View Example
+                                    </Button>
+                                  </OverlayTrigger>
+                                </div>
                               </div>
                             </div>
                           </motion.div>
@@ -2422,19 +2812,9 @@ const EndpointsPage = () => {
                       return null;
                     }
                     
-                    // Improved logic for handling XAuthUserId field:
-                    // For admin table, always show XAuthUserId dropdown
-                    if (key === 'XAuthUserId') {
-                      // For admin table, we always want to show the XAuthUserId field
-                      if (selectedEndpoint?.table === 'admin') {
-                        // Don't return null here, let it flow through to rendering below
-                      } else {
-                        // For other tables, only show if it's a true relationship field with data
-                        const isRelationshipField = getForeignKeyReference(key) && relatedTableData[key]?.length > 0;
-                        if (!isRelationshipField) {
-                          return null;
-                        }
-                      }
+                    // Hide XAuthUserId field for all tables except admin
+                    if (key === 'XAuthUserId' && selectedEndpoint?.table !== 'admin') {
+                      return null;
                     }
                     
                     // Hide created_at and updated_at in create mode
@@ -2737,6 +3117,158 @@ const EndpointsPage = () => {
           <p>{error}</p>
         </Alert>
       )}
+      
+      {/* CURL Example Modal */}
+      <Modal
+        show={showCurlModal}
+        onHide={() => setShowCurlModal(false)}
+        size="lg"
+        centered
+        className="dark-modal"
+      >
+        <Modal.Header closeButton className="border-bottom bg-dark text-white">
+          <Modal.Title>
+            <i className="bi bi-code-slash me-2"></i>
+            API Request Example {skipAuth ? "without Authentication" : "with Authentication"}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-dark text-white">
+          {selectedEndpoint && (
+            <>
+              <div className="mb-4">
+                <h6 className="text-light">
+                  <span className="badge me-2" style={{ backgroundColor: methodColors[selectedEndpoint.method || 'GET']?.bg || '#3b82f6' }}>
+                    {selectedEndpoint.method || 'GET'}
+                  </span>
+                  {selectedEndpoint.path || '/api/endpoint'}
+                </h6>
+                <p className="text-light mb-1">{selectedEndpoint.description || 'API endpoint'}</p>
+                {!skipAuth ? (
+                  <p className="text-muted small mb-0">
+                    <i className="bi bi-info-circle me-1"></i>
+                    All requests to the API require authentication headers
+                  </p>
+                ) : (
+                  <p className="text-warning small mb-0">
+                    <i className="bi bi-exclamation-triangle me-1"></i>
+                    Authentication is currently disabled for API requests
+                  </p>
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <h6 className="text-light mb-2">
+                  <i className="bi bi-link-45deg me-1"></i>
+                  Endpoint URL
+                </h6>
+                <div className="bg-black p-3 rounded mb-2">
+                  <code className="text-success">
+                    {selectedEndpoint.fullPath ? 
+                      (selectedEndpoint.fullPath.split(' ')[0]) : 
+                      (`http://localhost:3000/api/${apiId}/${selectedEndpoint.table || ''}`)}
+                  </code>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <h6 className="text-light mb-2">
+                  <i className="bi bi-key me-1"></i>
+                  {skipAuth ? "Headers" : "Required Headers"}
+                </h6>
+                <div className="bg-black p-3 rounded mb-2">
+                  <pre className="text-info mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+{skipAuth ? 
+`Content-Type: application/json
+X-Skip-Auth: true` :
+`Content-Type: application/json
+Authorization: Bearer ${getAccessToken() || 'YOUR_ACCESS_TOKEN'}`}
+                  </pre>
+                </div>
+              </div>
+              
+              <div>
+                <h6 className="text-light mb-2">
+                  <i className="bi bi-terminal me-1"></i>
+                  CURL Example
+                </h6>
+                <div className="bg-black p-3 rounded">
+                  <pre className="text-warning mb-0" style={{ whiteSpace: 'pre-wrap', overflowX: 'auto' }}>
+                    {generateCurlExample(selectedEndpoint)}
+                  </pre>
+                </div>
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline-info" 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generateCurlExample(selectedEndpoint));
+                      toast.success('CURL command copied to clipboard!');
+                    }}
+                  >
+                    <i className="bi bi-clipboard me-1"></i> Copy CURL Command
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="bg-dark border-top-0">
+          <Button variant="secondary" onClick={() => setShowCurlModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+      
+      {/* Skip Auth Warning Modal */}
+      <Modal
+        show={showSkipAuthWarning}
+        onHide={cancelSkipAuth}
+        backdrop="static"
+        centered
+        className="dark-modal"
+      >
+        <Modal.Header closeButton className="bg-dark text-white border-secondary">
+          <Modal.Title>
+            <FaExclamationTriangle className="text-warning me-2" /> Security Warning
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-dark text-white">
+          <div className="p-2 bg-warning bg-opacity-10 border border-warning rounded mb-3">
+            <div className="d-flex">
+              <div className="me-3">
+                <FaExclamationTriangle className="text-warning" size={24} />
+              </div>
+              <div>
+                <h5 className="text-warning">Disabling Authentication</h5>
+                <p className="mb-0">You are about to disable authentication for your API requests. This means:</p>
+                <ul className="mt-2 mb-0">
+                  <li>No authentication token will be required</li>
+                  <li>Your requests will use the "anonymous" user identity</li>
+                  <li>Anyone with access to your API endpoints can use them</li>
+                  <li>You may expose sensitive data or operations</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <p>This setting is useful for:</p>
+          <ul>
+            <li>Public API endpoints that don't require user context</li>
+            <li>Testing endpoints without authentication</li>
+            <li>Sharing API endpoints with external systems</li>
+          </ul>
+          
+          
+        </Modal.Body>
+        <Modal.Footer className="bg-dark border-secondary">
+          <Button variant="outline-light" onClick={cancelSkipAuth}>
+            Keep Authentication
+          </Button>
+          <Button variant="warning" onClick={confirmSkipAuth}>
+            Disable Authentication
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

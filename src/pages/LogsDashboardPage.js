@@ -43,39 +43,115 @@ const LogsDashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [logs, setLogs] = useState([]);
+  const [filteredLogs, setFilteredLogs] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [timeRange, setTimeRange] = useState('1 day');
+  const [timeRange, setTimeRange] = useState('today');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomDateFields, setShowCustomDateFields] = useState(false);
   
   // For detailed log view
   const [selectedLog, setSelectedLog] = useState(null);
   const [showLogModal, setShowLogModal] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const isAdmin = user?.XAuthUserId === 'aa' || user?.XAuthUserId === 'Admin';
+  const isAdmin = user?.username == 'Admin' || user?.username == 'aa';
   useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard');
       return;
     }
     
+    console.log('Current timeRange:', timeRange);
+    
     // Fetch logs and stats
     fetchLogs();
     fetchStats();
-  }, [isAdmin, timeRange]);
+  }, [isAdmin, timeRange, customStartDate, customEndDate, navigate]);
+
+  // Filter logs based on selected time range
+  useEffect(() => {
+    if (logs.length > 0) {
+      filterLogsByTimeRange();
+    }
+  }, [logs, timeRange, customStartDate, customEndDate]);
+
+  const filterLogsByTimeRange = () => {
+    const now = new Date();
+    let startDate;
+    
+    if (timeRange === 'custom' && customStartDate && customEndDate) {
+      startDate = new Date(customStartDate);
+      const endDate = new Date(customEndDate);
+      endDate.setHours(23, 59, 59, 999); // Set to end of day
+      
+      setFilteredLogs(logs.filter(log => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= startDate && logDate <= endDate;
+      }));
+      
+      return;
+    }
+    
+    switch (timeRange) {
+      case 'today':
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0); // Start of today
+        break;
+      case 'last7days':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'last30days':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 30);
+        break;
+      default:
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 1); // Default to 1 day
+    }
+    
+    setFilteredLogs(logs.filter(log => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= startDate && logDate <= now;
+    }));
+    
+    console.log(`Filtered logs from ${startDate.toISOString()} to ${now.toISOString()}`);
+  };
 
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/admin/logs');
+      
+      // Create a proper query string with the correct time range parameters
+      let queryParams = new URLSearchParams();
+      
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        queryParams.append('startDate', customStartDate);
+        queryParams.append('endDate', customEndDate);
+      } else {
+        queryParams.append('timeRange', timeRange);
+      }
+      
+      // Append the query string to the URL
+      const response = await fetch(`http://localhost:3000/admin/logs?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch logs: ${response.status}`);
       }
       
       const data = await response.json();
-      setLogs(data.logs || []);
+      console.log('Fetched logs data with parameters:', queryParams.toString(), data);
+      const logsData = data.logs || [];
+      setLogs(logsData);
+      // We'll set filtered logs in the useEffect
     } catch (error) {
       console.error('Error fetching logs:', error);
       setError(`Failed to load logs: ${error.message}`);
@@ -86,17 +162,56 @@ const LogsDashboardPage = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:3000/admin/logs/stats');
+      // Create a proper query string with the correct time range parameters
+      let queryParams = new URLSearchParams();
+      
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        queryParams.append('startDate', customStartDate);
+        queryParams.append('endDate', customEndDate);
+      } else {
+        queryParams.append('timeRange', timeRange);
+      }
+      
+      // Append the query string to the URL
+      const response = await fetch(`http://localhost:3000/admin/logs/stats?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch stats: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Fetched stats data with parameters:', queryParams.toString(), data);
       setStats(data);
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
+  };
+
+  const handleTimeRangeChange = (e) => {
+    const newValue = e.target.value;
+    console.log('Changing time range to:', newValue);
+    setTimeRange(newValue);
+    
+    if (newValue === 'custom') {
+      setShowCustomDateFields(true);
+    } else {
+      setShowCustomDateFields(false);
+      // Refetch stats with the new timeRange
+      fetchStats();
+    }
+  };
+
+  const handleCustomStartDateChange = (e) => {
+    setCustomStartDate(e.target.value);
+  };
+
+  const handleCustomEndDateChange = (e) => {
+    setCustomEndDate(e.target.value);
   };
 
   const navigateToHome = () => {
@@ -213,6 +328,13 @@ const LogsDashboardPage = () => {
     return "No error detected";
   };
 
+  // Function to handle filtering
+  const applyFilters = () => {
+    console.log('Applying filters with timeRange:', timeRange);
+    fetchLogs();
+    fetchStats();
+  };
+
   return (
     <motion.div
       initial="hidden"
@@ -251,20 +373,75 @@ const LogsDashboardPage = () => {
             <div className="d-flex gap-2">
               <Form.Select 
                 size="sm" 
-                onChange={(e) => setTimeRange(e.target.value)}
+                onChange={handleTimeRangeChange}
                 value={timeRange}
                 style={{
-                  background: 'rgba(30, 41, 59, 0.7)',
+                  background: 'rgba(30, 41, 59, 0.9)',
                   color: 'white',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(59, 130, 246, 0.5)',
                   borderRadius: '8px',
-                  width: 'auto'
+                  width: 'auto',
+                  paddingRight: '2rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
                 }}
+                className="form-select-sm"
               >
-                <option value="1 day">Last 24 hours</option>
-                <option value="7 days">Last 7 days</option>
-                <option value="30 days">Last 30 days</option>
+                <option value="today">Today</option>
+                <option value="last7days">Last 7 Days</option>
+                <option value="last30days">Last 30 Days</option>
+                <option value="custom">Custom Range</option>
               </Form.Select>
+              
+              {showCustomDateFields && (
+                <>
+                  <Form.Control
+                    type="date"
+                    size="sm"
+                    value={customStartDate}
+                    onChange={handleCustomStartDateChange}
+                    style={{
+                      background: 'rgba(30, 41, 59, 0.9)',
+                      color: 'white',
+                      border: '1px solid rgba(59, 130, 246, 0.5)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      width: 'auto',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                    }}
+                  />
+                  <Form.Control
+                    type="date"
+                    size="sm"
+                    value={customEndDate}
+                    onChange={handleCustomEndDateChange}
+                    style={{
+                      background: 'rgba(30, 41, 59, 0.9)',
+                      color: 'white',
+                      border: '1px solid rgba(59, 130, 246, 0.5)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      width: 'auto',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                    }}
+                  />
+                  <Button 
+                    variant="primary"
+                    size="sm"
+                    onClick={applyFilters}
+                    disabled={!customStartDate || !customEndDate}
+                    style={{
+                      borderRadius: '8px',
+                      background: 'rgba(59, 130, 246, 0.8)',
+                      border: 'none',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    Apply Filters
+                  </Button>
+                </>
+              )}
+              
               <Button
                 variant="outline-light"
                 className="d-flex align-items-center gap-2"
@@ -664,8 +841,8 @@ const LogsDashboardPage = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {logs.length > 0 ? (
-                          logs.map(log => (
+                        {filteredLogs.length > 0 ? (
+                          filteredLogs.map(log => (
                             <tr key={log.id} style={{ verticalAlign: 'middle' }}>
                               <td className="text-white-50">{formatTimestamp(log.timestamp)}</td>
                               <td>
@@ -1025,6 +1202,20 @@ const LogsDashboardPage = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Add this CSS to the bottom of the component to style the dropdown options */}
+      <style jsx="true">{`
+        .form-select-sm option {
+          background-color: #1a2233;
+          color: white;
+          padding: 10px;
+        }
+        
+        .form-select-sm:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+        }
+      `}</style>
 
     </motion.div>
   );

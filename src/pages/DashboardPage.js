@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthContext';
 import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine } from 'react-icons/fa';
+import { apiRequest } from '../utils/apiService';
 
 const fadeIn = {
   hidden: { opacity: 0 },
@@ -38,7 +39,7 @@ const DashboardPage = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   // Check if user is admin
-  const isAdmin = user?.username === 'aa' || user?.username === 'Admin';
+  const isAdmin = user?.username == 'Admin' || user?.username == 'aa';
 
   useEffect(() => {
     fetchUserApis();
@@ -49,34 +50,10 @@ const DashboardPage = () => {
       setLoading(true);
       setError(null);
       
-      const XAuthUserId = user?.XAuthUserId;
-      console.log(`Fetching APIs for user: ${XAuthUserId}`);
-      
-      const response = await fetch('http://localhost:3000/my-apis', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': XAuthUserId
-        }
+      // Use the new apiRequest utility with authorization
+      const data = await apiRequest('/my-apis', {
+        method: 'GET'
       });
-
-      console.log('API response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch APIs: ${response.status} ${response.statusText}`);
-      }
-
-      const responseText = await response.text();
-      console.log('Raw API response:', responseText);
-      
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        console.log('Parsed API data:', data);
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        throw new Error('Invalid JSON response from server');
-      }
       
       // Sort APIs by creation date (newest first)
       const sortedApis = (data.apis || []).sort((a, b) => {

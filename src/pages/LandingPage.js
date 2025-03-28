@@ -298,13 +298,13 @@ const LandingPage = () => {
                 </motion.div>
               </div>
               <h1 className="display-4 fw-bold text-white mb-1">
-                AI Database Schema Generator
+                AI-Powered API Builder
               </h1>
             </motion.div>
             
             <motion.div variants={itemVariants}>
               <p className="lead text-white-50 mb-4">
-                Describe your database in natural language and let AI create a visual schema with tables, relationships, and endpoints.
+                Just describe your backend in plain language, and let AI generate a complete database schema with tables, relationships, and instant API endpoints.
               </p>
             </motion.div>
 
@@ -353,9 +353,9 @@ const LandingPage = () => {
             filter: 'blur(15px)',
             borderRadius: '50%',
           }}></div>
-          <p className="text-white-50 small m-0">
+          {/* <p className="text-white-50 small m-0">
             &copy; {new Date().getFullYear()} API Generator AI
-          </p>
+          </p> */}
         </div>
       </motion.footer>
     </div>

@@ -110,12 +110,15 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }
         data: {
           label: table.name,
           tableName: table.name,
-          fields: table.columns.map(col => ({
-            name: col.name,
-            type: col.type,
-            isPrimary: col.isPrimary,
-            isForeign: col.isForeign
-          }))
+          fields: table.columns
+            // Filter out XAuthUserId field from display
+            .filter(col => col.name !== 'XAuthUserId')
+            .map(col => ({
+              name: col.name,
+              type: col.type,
+              isPrimary: col.isPrimary,
+              isForeign: col.isForeign
+            }))
         },
       };
     });
