@@ -74,6 +74,8 @@ const EndpointsPage = () => {
   const [error, setError] = useState(null);
   const [skipAuth, setSkipAuth] = useState(false);
   const [showSkipAuthWarning, setShowSkipAuthWarning] = useState(false);
+  const endpointOrigin = localStorage.getItem('endpoint_origin');
+  const backButtonLabel = endpointOrigin === 'dashboard' ? 'Back to Dashboard' : 'Back to Schema';
   
   // Format conversion helpers
   const defaultValueForType = (type) => {
@@ -842,9 +844,12 @@ const EndpointsPage = () => {
   };
 
   const handleGoBack = () => {
-    // Navigate back to the schema page but signal that we need to do a fresh load
-    sessionStorage.setItem('reload_schema', 'true');
-    navigate('/schema');
+    if (endpointOrigin === 'dashboard') {
+      navigate('/dashboard');
+    } else {
+      sessionStorage.setItem('reload_schema', 'true');
+      navigate('/schema');
+    }
   };
 
   // Utility function to handle authenticated fetches with automatic token refresh
@@ -2221,7 +2226,7 @@ const EndpointsPage = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="me-2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
                 </svg>
-                Back to Schema
+                {backButtonLabel}
               </span>
             </Button>
           </motion.div>
@@ -2320,7 +2325,7 @@ const EndpointsPage = () => {
                 onClick={handleGoBack}
                 className="px-4 py-2 rounded-pill"
               >
-                Return to Schema Page
+                {backButtonLabel}
               </Button>
             </div>
           </div>

@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthContext';
 import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine } from 'react-icons/fa';
 import { apiRequest } from '../utils/apiService';
-
+import GlobalSpinner from '../components/common/GlobalSpinner';
+import SpinnerLoading from '../components/common/SpinnerLoading';
 const fadeIn = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.4 } }
@@ -74,6 +75,7 @@ const DashboardPage = () => {
   const handleApiSelect = (apiId) => {
     // Store the selected API ID in localStorage for use on the endpoints page
     localStorage.setItem('selectedApiId', apiId);
+    localStorage.setItem('endpoint_origin', 'dashboard');
     navigate('/endpoints');
   };
 
@@ -298,13 +300,15 @@ const DashboardPage = () => {
           <div className="text-center my-5 py-5">
             <motion.div
               animate={{ 
-                rotate: 360,
-                transition: { duration: 1.5, repeat: Infinity, ease: "linear" } 
+                // rotate: 360,
+                // transition: { duration: 1.5, repeat: Infinity, ease: "linear" } 
               }}
               className="mb-4"
               style={{ display: 'inline-block' }}
             >
-              <FaServer size={40} className="text-primary" />
+              {/* <FaServer size={40} className="text-primary" /> */}
+              {/* <Spinner animation="border" variant="primary" /> */}
+              <SpinnerLoading />
             </motion.div>
             <p className="mt-3 text-light">Loading your APIs...</p>
           </div>

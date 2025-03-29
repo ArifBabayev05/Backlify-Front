@@ -165,12 +165,12 @@ const LoginPage = () => {
               </Form.Group>
 
               <Form.Group className="mb-4">
-                <div className="d-flex justify-content-between">
+                {/* <div className="d-flex justify-content-between">
                   <Form.Label className="text-white-50">Password</Form.Label>
                   <Link to="/forgot-password" className="small text-decoration-none" style={{ color: '#3b82f6' }}>
                     Forgot password?
                   </Link>
-                </div>
+                </div> */}
                 <Form.Control
                   type="password"
                   name="password"

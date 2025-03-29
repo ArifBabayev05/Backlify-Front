@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthContext';
 import { FaServer, FaHome, FaChartLine, FaClock, FaUsers, FaUserAlt, FaExclamationTriangle, FaCheck, FaEye, FaFileCode, FaInfoCircle, FaExchangeAlt } from 'react-icons/fa';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import SpinnerLoading from '../components/common/SpinnerLoading';
 
 const fadeIn = {
   hidden: { opacity: 0 },
@@ -495,13 +496,15 @@ const LogsDashboardPage = () => {
           <div className="text-center my-5 py-5">
             <motion.div
               animate={{ 
-                rotate: 360,
-                transition: { duration: 1.5, repeat: Infinity, ease: "linear" } 
+                // rotate: 360,
+                // transition: { duration: 1.5, repeat: Infinity, ease: "linear" } 
               }}
               className="mb-4"
               style={{ display: 'inline-block' }}
             >
-              <FaChartLine size={40} className="text-success" />
+              {/* <FaServer size={40} className="text-primary" /> */}
+              {/* <Spinner animation="border" variant="primary" /> */}
+              <SpinnerLoading />
             </motion.div>
             <p className="mt-3 text-light">Loading system analytics...</p>
           </div>
@@ -856,7 +859,7 @@ const LogsDashboardPage = () => {
                                     }}>
                                     <FaUserAlt size={12} className="text-white-50" />
                                   </div>
-                                  <span className="text-white">{log.XAuthUserId}</span>
+                                  <span className="text-white">{log.XAuthUserId.substring(0,30)}</span>
                                 </div>
                               </td>
                               <td>
