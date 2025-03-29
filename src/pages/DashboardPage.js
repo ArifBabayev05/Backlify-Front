@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Alert, Pagination } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Spinner, Alert, Pagination, Badge } from 'react-bootstrap';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthContext';
-import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine } from 'react-icons/fa';
+import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine, FaSyncAlt } from 'react-icons/fa';
 import { apiRequest } from '../utils/apiService';
 import GlobalSpinner from '../components/common/GlobalSpinner';
 import SpinnerLoading from '../components/common/SpinnerLoading';
+import useCacheControl from '../utils/useCacheControl';
 const fadeIn = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.4 } }
@@ -33,6 +34,11 @@ const DashboardPage = () => {
   const [apis, setApis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isCached, setIsCached] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  
+  // Get cache control functions from our custom hook
+  const { invalidateCache, forceRefresh } = useCacheControl();
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,18 +49,86 @@ const DashboardPage = () => {
   const isAdmin = user?.username == 'Admin' || user?.username == 'aa';
 
   useEffect(() => {
-    fetchUserApis();
+    // When component mounts, check if we need a fresh reload
+    const shouldRefresh = localStorage.getItem('refresh_dashboard') === 'true';
+    
+    // Always fetch APIs when the component mounts
+    fetchUserApis(shouldRefresh);
+    
+    // Clear the refresh flag if it exists
+    if (shouldRefresh) {
+      localStorage.removeItem('refresh_dashboard');
+    }
+    
+    // Set up background refresh (every 30 seconds)
+    const refreshInterval = setInterval(() => {
+      // Perform a background refresh without showing loading state
+      backgroundRefresh();
+    }, 30000); // 30 seconds
+    
+    // Cleanup the interval on component unmount
+    return () => clearInterval(refreshInterval);
   }, []);
+  
+  // Function for doing a silent background refresh
+  const backgroundRefresh = async () => {
+    try {
+      console.log('[Background] Checking for new APIs...');
+      // Use the apiRequest utility with skipCache to get fresh data
+      const data = await apiRequest('/my-apis', {
+        method: 'GET',
+        skipCache: true
+      });
+      
+      // Sort APIs by creation date (newest first)
+      const sortedApis = (data.apis || []).sort((a, b) => {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+      
+      // Compare with current data to see if there are any changes
+      const currentApisJson = JSON.stringify(apis.map(api => api.apiId).sort());
+      const newApisJson = JSON.stringify(sortedApis.map(api => api.apiId).sort());
+      
+      if (currentApisJson !== newApisJson) {
+        console.log('[Background] New API data detected, updating...');
+        // Update the state with new data
+        setApis(sortedApis);
+        setTotalPages(Math.ceil(sortedApis.length / apisPerPage));
+        // Reset to first page if we have new data and clear any cached data
+        setCurrentPage(1);
+        invalidateCache('/my-apis');
+      } else {
+        console.log('[Background] No new API data');
+      }
+      
+      setLastRefreshTime(new Date());
+    } catch (error) {
+      console.error('[Background] Error checking for new APIs:', error);
+      // Don't show errors for background refreshes
+    }
+  };
 
-  const fetchUserApis = async () => {
+  const fetchUserApis = async (skipCache = false) => {
     try {
       setLoading(true);
       setError(null);
+      setIsCached(false);
       
-      // Use the new apiRequest utility with authorization
-      const data = await apiRequest('/my-apis', {
-        method: 'GET'
-      });
+      // Use the apiRequest utility with caching
+      const options = {
+        method: 'GET',
+        // Skip cache if requested
+        ...(skipCache ? { skipCache: true } : {})
+      };
+      
+      // Track if we're using cached data
+      const startTime = performance.now();
+      
+      const data = await apiRequest('/my-apis', options);
+      
+      // If the request was very fast (<50ms), it likely came from cache
+      const endTime = performance.now();
+      setIsCached(endTime - startTime < 50);
       
       // Sort APIs by creation date (newest first)
       const sortedApis = (data.apis || []).sort((a, b) => {
@@ -63,6 +137,7 @@ const DashboardPage = () => {
       
       setApis(sortedApis);
       setTotalPages(Math.ceil(sortedApis.length / apisPerPage));
+      setLastRefreshTime(new Date());
       console.log('APIs loaded:', sortedApis.length || 0);
     } catch (error) {
       console.error('Error fetching user APIs:', error);
@@ -70,6 +145,11 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = () => {
+    // Force refresh by skipping cache
+    fetchUserApis(true);
   };
 
   const handleApiSelect = (apiId) => {
@@ -362,6 +442,36 @@ const DashboardPage = () => {
           </motion.div>
         ) : (
           <>
+            {/* Add refresh button and cache indicator */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div>
+                {isCached && (
+                  <Badge bg="info" className="me-2 py-2 px-3" style={{ borderRadius: '8px' }}>
+                    <small>Using cached data</small>
+                  </Badge>
+                )}
+                {lastRefreshTime && (
+                  <span className="text-white-50 small">
+                    Last updated: {lastRefreshTime.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              <Button 
+                variant="outline-primary" 
+                size="sm" 
+                onClick={handleRefresh}
+                className="d-flex align-items-center gap-2"
+                style={{
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem',
+                  borderColor: 'rgba(59, 130, 246, 0.4)'
+                }}
+              >
+                <FaSyncAlt size={14} />
+                <span>Refresh</span>
+              </Button>
+            </div>
+
             {/* Search Bar */}
             
 

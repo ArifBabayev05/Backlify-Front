@@ -70,12 +70,15 @@ const EndpointsPage = () => {
   const [relatedTableData, setRelatedTableData] = useState({});
   // Add state for storing complete schema information
   const [completeSchemaInfo, setCompleteSchemaInfo] = useState(null);
+  // Add mapping between foreign key fields and their related tables
+  const [fieldToTableMap, setFieldToTableMap] = useState({});
   // Add error state to the component's state variables
   const [error, setError] = useState(null);
   const [skipAuth, setSkipAuth] = useState(false);
   const [showSkipAuthWarning, setShowSkipAuthWarning] = useState(false);
-  const endpointOrigin = localStorage.getItem('endpoint_origin');
-  const backButtonLabel = endpointOrigin === 'dashboard' ? 'Back to Dashboard' : 'Back to Schema';
+  // Make sure we capture the endpoint origin (where the user came from)
+  const [originPage, setOriginPage] = useState(localStorage.getItem('endpoint_origin') || 'dashboard');
+  const backButtonLabel = originPage === 'dashboard' ? 'Back to Dashboard' : 'Back to Schema';
   
   // Format conversion helpers
   const defaultValueForType = (type) => {
@@ -302,50 +305,75 @@ const EndpointsPage = () => {
       return [];
     }
     
+    // Check if we already have this data cached
+    if (relatedTableData[table] && relatedTableData[table].length > 0) {
+      console.log(`Using cached data for ${table}`);
+      return relatedTableData[table];
+    }
+    
     try {
+      console.log(`Loading related table data for ${table}`);
+      
       // Create URL with limit parameter
       let url = `${apiBaseUrl}/${table}?limit=100`;
       
-      // Add skipAuth parameter if needed
-      // if (skipAuth) {
-      //   url += '&skipAuth=true';
-      // }
+      // Note: skipAuth parameter will be added by fetchWithAuth, so we don't add it here
+      // to prevent duplication
       
-      console.log(`Loading related data for ${table} from: ${url} with skipAuth=${skipAuth}`);
+      console.log(`Fetching from URL: ${url} with skipAuth=${skipAuth}`);
       
       const response = await fetchWithAuth(url);
       
       if (!response.ok) {
         console.error(`Error loading related data for ${table}: ${response.status} ${response.statusText}`);
-        // Try the original table name as fallback
-        if (table !== table) {
-          console.log(`Trying original table name: ${table}`);
-          const fallbackUrl = `${apiBaseUrl}/${table}?limit=100`;
-          const fallbackResponse = await fetch(fallbackUrl);
+        
+        // Try pluralized/singularized table name as fallback
+        const alternateTable = table.endsWith('s') ? table.slice(0, -1) : `${table}s`;
+        
+        if (alternateTable !== table) {
+          console.log(`Trying alternate table name: ${alternateTable}`);
+          const fallbackUrl = `${apiBaseUrl}/${alternateTable}?limit=100`;
+          const fallbackResponse = await fetchWithAuth(fallbackUrl);
+          
           if (fallbackResponse.ok) {
             const fallbackData = await fallbackResponse.json();
-            console.log(`Fallback request succeeded for ${table}:`, fallbackData);
-            if (Array.isArray(fallbackData?.data)) {
-              return fallbackData.data;
-            } else if (Array.isArray(fallbackData)) {
-              return fallbackData;
-            }
+            console.log(`Fallback request succeeded for ${alternateTable}:`, fallbackData);
+            const resultData = Array.isArray(fallbackData?.data) ? fallbackData.data : 
+                              Array.isArray(fallbackData) ? fallbackData : [];
+            
+            // Cache the result
+            setRelatedTableData(prev => ({
+              ...prev,
+              [table]: resultData
+            }));
+            
+            return resultData;
           }
         }
+        
         return [];
       }
       
-      const data = await response.json();
-      
-      console.log(`Received data from ${table}:`, data);
-      
-      if (Array.isArray(data?.data)) {
-        return data.data;
-      } else if (Array.isArray(data)) {
-        return data;
+      let data;
+      try {
+        const responseText = await response.text();
+        data = JSON.parse(responseText);
+        console.log(`Received data from ${table}:`, data);
+      } catch (error) {
+        console.error(`Error parsing response for ${table}:`, error);
+        return [];
       }
       
-      return [];
+      const resultData = Array.isArray(data?.data) ? data.data : 
+                        Array.isArray(data) ? data : [];
+      
+      // Cache the result
+      setRelatedTableData(prev => ({
+        ...prev,
+        [table]: resultData
+      }));
+      
+      return resultData;
     } catch (error) {
       console.error(`Error loading related data for ${table}:`, error);
       return [];
@@ -362,6 +390,17 @@ const EndpointsPage = () => {
     
     console.log('API loading flag:', apiLoadingFlag);
     console.log('Stored endpoints available:', !!storedEndpoints);
+    
+    // Capture where the user came from
+    if (apiLoadingFlag === 'true') {
+      // If coming from schema page with loading flag, set origin to 'schema'
+      setOriginPage('schema');
+      localStorage.setItem('endpoint_origin', 'schema');
+    } else {
+      // Otherwise, use what's in localStorage or default to dashboard
+      const origin = localStorage.getItem('endpoint_origin') || 'dashboard';
+      setOriginPage(origin);
+    }
     
     if (apiLoadingFlag === 'true' && storedEndpoints) {
       console.log('Loading endpoints from session storage');
@@ -415,7 +454,7 @@ const EndpointsPage = () => {
       // Get auth headers for constructing the endpoint URLs
       const token = getAccessToken();
       const authHeadersInfo = token ? `(With Auth Header)` : '';
-      const skipAuthParam = skipAuth ? '?skipAuth=true' : '';
+      // Don't append skipAuth to URLs
       const authStatus = skipAuth ? 'No Auth' : 'Auth Required';
       
       // Initialize endpoints based on the tables in the API
@@ -430,35 +469,35 @@ const EndpointsPage = () => {
               path: `/${table}`,
               description: `List all ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}${skipAuthParam} (${authStatus})`
+              fullPath: `http://localhost:3000/api/${apiId}/${table} (${authStatus})`
             },
             {
               method: 'GET',
               path: `/${table}/:id`,
               description: `Get a single ${table} by ID`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id${skipAuthParam} (${authStatus})`
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id (${authStatus})`
             },
             {
               method: 'POST',
               path: `/${table}`,
               description: `Create a new ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}${skipAuthParam} (${authStatus})`
+              fullPath: `http://localhost:3000/api/${apiId}/${table} (${authStatus})`
             },
             {
               method: 'PUT',
               path: `/${table}/:id`,
               description: `Update an existing ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id${skipAuthParam} (${authStatus})`
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id (${authStatus})`
             },
             {
               method: 'DELETE',
               path: `/${table}/:id`,
               description: `Delete a ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id${skipAuthParam} (${authStatus})`
+              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id (${authStatus})`
             }
           ]
         };
@@ -718,10 +757,8 @@ const EndpointsPage = () => {
       // Create URL with pagination parameters
       let url = `${apiBaseUrl}/${table}?page=${page}&limit=${limit}`;
       
-      // Add skipAuth parameter if needed
-      if (skipAuth) {
-        url += '&skipAuth=true';
-      }
+      // Note: skipAuth parameter will be added by fetchWithAuth, so we don't add it here
+      // to prevent duplication
       
       console.log(`Fetching from URL: ${url} with skipAuth=${skipAuth}`);
       
@@ -800,10 +837,8 @@ const EndpointsPage = () => {
       // Create URL with limit parameter
       let url = `${apiBaseUrl}/users?limit=100`;
       
-      // Add skipAuth parameter if needed
-      if (skipAuth) {
-        url += '&skipAuth=true';
-      }
+      // Note: skipAuth parameter will be added by fetchWithAuth, so we don't add it here
+      // to prevent duplication
       
       console.log(`Loading users data from: ${url} with skipAuth=${skipAuth}`);
       
@@ -844,9 +879,14 @@ const EndpointsPage = () => {
   };
 
   const handleGoBack = () => {
-    if (endpointOrigin === 'dashboard') {
+    console.log(`Navigating back to ${originPage} page`);
+    
+    if (originPage === 'dashboard') {
+      // When going back to dashboard, set a flag to refresh it to show the latest APIs
+      localStorage.setItem('refresh_dashboard', 'true');
       navigate('/dashboard');
     } else {
+      // When going back to schema, set a flag to reload schema data if needed
       sessionStorage.setItem('reload_schema', 'true');
       navigate('/schema');
     }
@@ -855,21 +895,14 @@ const EndpointsPage = () => {
   // Utility function to handle authenticated fetches with automatic token refresh
   const fetchWithAuth = async (url, options = {}) => {
     try {
-      // Add skipAuth query parameter if enabled
-      const finalUrl = skipAuth ? 
-        (url.includes('?') ? `${url}&skipAuth=true` : `${url}?skipAuth=true`) : 
-        url;
+      // Don't add skipAuth parameter to API calls
+      const finalUrl = url;
       
-      // Get auth headers and merge with any provided headers
+      // Always use auth headers for actual API calls
       const headers = {
         ...getAuthHeaders(),
         ...options.headers
       };
-      
-      // Add X-Skip-Auth header if skipAuth is enabled
-      if (skipAuth) {
-        headers['X-Skip-Auth'] = 'true';
-      }
       
       // Create the initial request config
       const config = {
@@ -877,13 +910,13 @@ const EndpointsPage = () => {
         headers
       };
       
-      console.log(`Making ${skipAuth ? 'non-authenticated' : 'authenticated'} request to: ${finalUrl}`);
+      console.log(`Making authenticated request to: ${finalUrl}`);
       
       // Make the first request
       let response = await fetch(finalUrl, config);
       
-      // If skipAuth is enabled, don't attempt token refresh
-      if (!skipAuth && (response.status === 401 || response.status === 403)) {
+      // Try token refresh if we get a 401/403
+      if (response.status === 401 || response.status === 403) {
         try {
           console.log('Token expired, attempting refresh...');
           // Try to refresh the token
@@ -894,11 +927,6 @@ const EndpointsPage = () => {
             ...getAuthHeaders(),
             ...options.headers
           };
-          
-          // Add X-Skip-Auth header if skipAuth is enabled
-          if (skipAuth) {
-            newHeaders['X-Skip-Auth'] = 'true';
-          }
           
           // Create a new config with the updated headers
           const newConfig = {
@@ -1146,20 +1174,43 @@ const EndpointsPage = () => {
           console.log(`Loading related data for ${field} from table ${relatedTable}`);
           relationshipLoading.push(
             loadRelatedTableData(relatedTable).then(data => {
+              // Explicitly set the relation between the field and the table
+              console.log(`Setting relationship mapping: ${field} -> ${relatedTable} (${data.length} records)`);
               setRelatedTableData(prev => ({
                 ...prev,
                 [field]: data
               }));
+              
+              // Also store in a direct mapping for this field
+              const foreignKeyMap = {...fieldToTableMap};
+              foreignKeyMap[field] = relatedTable;
+              setFieldToTableMap(foreignKeyMap);
+              
               return { field, relatedTable, data };
+            }).catch(error => {
+              console.error(`Failed to load data for ${field} from ${relatedTable}:`, error);
+              return { field, relatedTable, error };
             })
           );
+        } else {
+          console.warn(`Could not determine related table for foreign key: ${field}`);
         }
       }
       
       // Wait for all relationship data to load
       if (relationshipLoading.length > 0) {
         const results = await Promise.allSettled(relationshipLoading);
-        console.log('Finished loading relationship data:', results);
+        console.log('Finished loading relationship data:', results.map(r => 
+          r.status === 'fulfilled' ? 
+            `${r.value.field}: ${r.value.data?.length || 0} records` : 
+            `${r.reason?.field || 'unknown'}: failed`
+        ));
+        
+        // Log all related dropdown data for debugging
+        console.log('Complete related table mapping:', fieldToTableMap);
+        console.log('Available dropdown data:', Object.keys(relatedTableData).map(key => 
+          `${key}: ${relatedTableData[key]?.length || 0} items`
+        ));
       }
       
       // Initialize form data based on mode
@@ -1364,11 +1415,135 @@ const EndpointsPage = () => {
   };
 
   const handleFormChange = (key, value) => {
+    console.log(`Form change: ${key} = ${value} (type: ${typeof value})`);
+    
+    // Special handling for ID fields (dropdown selections)
+    if (key.endsWith('_id') && key !== 'id') {
+      // For ID fields, if the value is a string but represents a number, convert it
+      // Empty string should be converted to null
+      if (value === '') {
+        setFormData(prev => ({ ...prev, [key]: null }));
+      } else {
+        // Try to convert to number if it's a numeric string
+        const numValue = Number(value);
+        if (!isNaN(numValue)) {
+          setFormData(prev => ({ ...prev, [key]: numValue }));
+        } else {
+          // Keep as string if it's not convertible to number
+          setFormData(prev => ({ ...prev, [key]: value }));
+        }
+      }
+      return;
+    }
+    
+    // Handle type conversion for numeric fields
+    if (getFieldType(key) === 'number') {
+      // For empty inputs, use null instead of trying to parse an empty string to number
+      if (value === '') {
+        setFormData(prev => ({ ...prev, [key]: null }));
+        return;
+      }
+      
+      // For numeric fields, convert to number
+      const numValue = Number(value);
+      if (!isNaN(numValue)) {
+        setFormData(prev => ({ ...prev, [key]: numValue }));
+      }
+      // If conversion fails, don't update the state (keep previous valid value)
+      return;
+    }
+    
+    // For other field types, update normally
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
   // Add a function to detect field types based on field name or content
   const getFieldType = (key, value) => {
+    // First check table schema for this field if available
+    if (selectedEndpoint && tableSchemas[selectedEndpoint.table]) {
+      const schema = tableSchemas[selectedEndpoint.table];
+      if (schema[key]) {
+        // Use the schema type information
+        const fieldSchema = schema[key];
+        
+        // For database integer types, always return 'number'
+        if (fieldSchema.type === 'integer' || fieldSchema.type === 'id') {
+          return 'number';
+        }
+        
+        // For known database types
+        if (fieldSchema.type === 'timestamp' || fieldSchema.type === 'date') {
+          return 'date';
+        }
+        
+        if (fieldSchema.type === 'boolean') {
+          return 'boolean';
+        }
+        
+        if (fieldSchema.type === 'number' || fieldSchema.type === 'float' || 
+            fieldSchema.type === 'decimal' || fieldSchema.type === 'numeric') {
+          return 'number';
+        }
+        
+        if (fieldSchema.type === 'longtext') {
+          return 'longtext';
+        }
+      }
+    }
+    
+    // Fallback to checking column schema from the API definition
+    if (selectedEndpoint && completeSchemaInfo) {
+      const table = completeSchemaInfo.find(t => t.name === selectedEndpoint.table);
+      if (table && table.columns) {
+        const column = table.columns.find(c => c.name === key);
+        if (column) {
+          // Column types directly from database schema
+          if (column.type && (
+              column.type === 'int' || 
+              column.type === 'integer' || 
+              column.type === 'bigint' || 
+              column.type === 'smallint' || 
+              column.type.includes('int')
+             )) {
+            return 'number';
+          }
+          
+          if (column.type && (
+              column.type === 'numeric' || 
+              column.type === 'decimal' || 
+              column.type === 'float' || 
+              column.type === 'double' ||
+              column.type === 'real' ||
+              column.type.includes('money')
+             )) {
+            return 'number';
+          }
+          
+          if (column.type && (
+              column.type === 'timestamp' || 
+              column.type === 'timestamptz' || 
+              column.type === 'date'
+             )) {
+            return 'date';
+          }
+          
+          if (column.type === 'boolean' || column.type === 'bool') {
+            return 'boolean';
+          }
+        }
+      }
+    }
+    
+    // Check common field names that should be numeric
+    const numericFields = ['price', 'amount', 'quantity', 'stock', 'count', 'total', 'cost', 'rate', 
+                          'number', 'num', 'height', 'width', 'length', 'weight', 'age', 'size'];
+    
+    if (numericFields.some(field => key.toLowerCase().includes(field))) {
+      return 'number';
+    }
+    
+    // Fallback to heuristics based on field name and value
+    
     // Common date field names
     const dateFields = ['date', 'birth', 'dob', 'created_at', 'updated_at', 'birthday', 'birthdate'];
     
@@ -1377,15 +1552,29 @@ const EndpointsPage = () => {
       return 'date';
     }
     
-    // Check if it's a number field
-    if (key.includes('id') || key.includes('_id') || key === 'id') {
+    // Check if it's a number field by name pattern
+    if (key === 'id' || key.endsWith('_id') || key.includes('_id_')) {
       return 'number';
     }
     
-    // Default to text
+    // Check by value type
+    if (value !== null && value !== undefined) {
+      if (typeof value === 'number') {
+        return 'number';
+      }
+      if (typeof value === 'boolean') {
+        return 'boolean';
+      }
+      // Check if the string value is actually a number
+      if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
+        return 'number';
+      }
+    }
+    
+    // Default to text for unknown types
     return 'text';
   };
-  
+
   // Add a function to determine input type for rendering
   const getInputType = (key) => {
     const fieldType = getFieldType(key);
@@ -1394,6 +1583,10 @@ const EndpointsPage = () => {
       return 'date';
     } else if (fieldType === 'number') {
       return 'number';
+    } else if (fieldType === 'boolean') {
+      return 'checkbox';
+    } else if (fieldType === 'longtext') {
+      return 'textarea';
     }
     
     return 'text';
@@ -1428,6 +1621,14 @@ const EndpointsPage = () => {
     if (!selectedEndpoint || !selectedEndpoint.table) {
       console.error('Invalid endpoint configuration:', selectedEndpoint);
       setSubmitError('Invalid endpoint configuration');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Check for required fields that are missing values
+    const requiredValidationErrors = validateRequiredFields(formData, selectedEndpoint.table);
+    if (requiredValidationErrors) {
+      setSubmitError(requiredValidationErrors);
       setIsLoading(false);
       return;
     }
@@ -1579,6 +1780,45 @@ const EndpointsPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to validate required fields based on schema and foreign keys
+  const validateRequiredFields = (data, tableName) => {
+    // First, check for required foreign key fields (fields ending with _id)
+    const foreignKeyFields = Object.keys(data).filter(key => 
+      key.endsWith('_id') && key !== 'id' && key !== 'XAuthUserId'
+    );
+    
+    // Check if any foreign key field is missing a value
+    for (const field of foreignKeyFields) {
+      if (!data[field] && data[field] !== 0) {
+        // Get a friendly field name for the error message
+        const friendlyFieldName = formatFieldName(field);
+        return `Please select a value for ${friendlyFieldName}`;
+      }
+    }
+    
+    // Check for other required fields from the schema
+    if (tableSchemas[tableName]) {
+      const schema = tableSchemas[tableName];
+      
+      for (const [field, fieldSchema] of Object.entries(schema)) {
+        // Skip id field for create operations
+        if (field === 'id' && modalMode === 'create') continue;
+        
+        // Skip created_at and updated_at fields as they're auto-generated
+        if (field === 'created_at' || field === 'updated_at') continue;
+        
+        // Check if the field is required according to schema
+        if (fieldSchema.required && (!data[field] && data[field] !== 0 && data[field] !== false)) {
+          const friendlyFieldName = formatFieldName(field);
+          return `${friendlyFieldName} is required`;
+        }
+      }
+    }
+    
+    // If no validation errors were found, return null
+    return null;
   };
 
   // Filter endpoints by HTTP method
@@ -1900,18 +2140,13 @@ const EndpointsPage = () => {
       url = 'http://localhost:3000/api/your-api-id/your-endpoint';
     }
     
-    // Add skipAuth parameter if enabled
-    if (skipAuth && !url.includes('skipAuth=true')) {
-      url = url.includes('?') ? `${url}&skipAuth=true` : `${url}?skipAuth=true`;
-    }
-    
     let method = endpoint.method || 'GET';
     let curlCmd = `curl -X ${method} "${url}"`;
     
     // Add headers
     curlCmd += ` \\\n  -H "Content-Type: application/json"`;
     
-    // Only add auth headers if skipAuth is false
+    // Apply skipAuth only to examples, not actual API calls
     if (!skipAuth) {
       curlCmd += ` \\\n  -H "Authorization: Bearer ${token}"`;
     } else {
@@ -2089,7 +2324,7 @@ const EndpointsPage = () => {
     return curlCmd;
   };
 
-  // Function to toggle skipAuth mode
+  // Function to toggle skipAuth mode (only for examples)
   const handleToggleSkipAuth = () => {
     if (!skipAuth) {
       // If enabling skipAuth, show warning first
@@ -2104,10 +2339,7 @@ const EndpointsPage = () => {
   const confirmSkipAuth = () => {
     setSkipAuth(true);
     setShowSkipAuthWarning(false);
-    // Reload endpoints with the new setting
-    if (apiId) {
-      loadApiEndpoints(apiId);
-    }
+    // No need to reload endpoints since this only affects examples
   };
 
   // Function to cancel skipAuth
@@ -2447,8 +2679,8 @@ const EndpointsPage = () => {
                               .map(([key, value]) => (
                                 <td key={key} className="py-3 px-4">
                                   {typeof value === 'object' 
-                                    ? JSON.stringify(value).substring(0, 30) + (JSON.stringify(value).length > 30 ? '...' : '')
-                                    : String(value).substring(0, 30) + (String(value).length > 30 ? '...' : '')}
+                                    ? JSON.stringify(value).substring(0, 60) + (JSON.stringify(value).length > 60 ? '...' : '')
+                                    : String(value).substring(0, 60) + (String(value).length > 60 ? '...' : '')}
                                 </td>
                               ))}
                             <td className="text-end py-3 px-4">
@@ -2823,7 +3055,10 @@ const EndpointsPage = () => {
               
               {submitError && (
                 <Alert variant="danger" className="mb-4">
-                  <p className="mb-0"><strong>Error:</strong> {submitError}</p>
+                  <p className="mb-0">
+                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Required Field:</strong> {submitError}
+                  </p>
                 </Alert>
               )}
               
@@ -2884,8 +3119,17 @@ const EndpointsPage = () => {
                         <Form.Label className="text-capitalize text-light">{formatFieldName(key)}</Form.Label>
                         {key.endsWith('_id') && key !== 'id' ? (
                           <Form.Select
-                            value={value}
-                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            value={value !== null && value !== undefined ? value : ''}
+                            onChange={(e) => {
+                              console.log(`Select changed for ${key}: value="${e.target.value}" (type: ${typeof e.target.value})`);
+                              const selectedValue = e.target.value;
+                              // Convert empty string to null, otherwise try to convert to number if it's a numeric ID
+                              const processedValue = selectedValue === '' ? null : 
+                                (!isNaN(Number(selectedValue)) && selectedValue !== '') ? Number(selectedValue) : selectedValue;
+                              
+                              console.log(`Processed value: ${processedValue} (type: ${typeof processedValue})`);
+                              setFormData(prev => ({ ...prev, [key]: processedValue }));
+                            }}
                             disabled={modalMode === 'read'}
                             className="border bg-dark text-white"
                           >
@@ -2952,7 +3196,42 @@ const EndpointsPage = () => {
                           <Form.Control
                             type={getFieldType(key, value) === 'number' ? 'number' : 'text'}
                             value={value !== null && value !== undefined ? value : ''}
-                            onChange={(e) => handleFormChange(key, e.target.value)}
+                            onChange={(e) => {
+                              // For numeric fields, prevent invalid input characters
+                              if (getFieldType(key, value) === 'number') {
+                                // Allow only numeric input (including decimal point and minus sign)
+                                const isValidInput = /^-?\d*\.?\d*$/.test(e.target.value);
+                                
+                                if (e.target.value === '' || isValidInput) {
+                                  // For empty inputs, use null
+                                  if (e.target.value === '') {
+                                    handleFormChange(key, null);
+                                  } else {
+                                    // Parse as number before updating state
+                                    const numValue = Number(e.target.value);
+                                    if (!isNaN(numValue)) {
+                                      handleFormChange(key, numValue);
+                                    }
+                                  }
+                                }
+                                // Ignore invalid numeric input
+                              } else {
+                                // For non-numeric fields, pass the value as is
+                                handleFormChange(key, e.target.value);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // On blur, ensure the number is formatted correctly
+                              if (getFieldType(key, value) === 'number' && e.target.value !== '') {
+                                const numValue = Number(e.target.value);
+                                if (!isNaN(numValue)) {
+                                  // Format the number and update the field
+                                  handleFormChange(key, numValue);
+                                }
+                              }
+                            }}
+                            min={getFieldType(key, value) === 'number' ? '0' : undefined}
+                            step={getFieldType(key, value) === 'number' ? 'any' : undefined}
                             disabled={modalMode === 'read'}
                             className="border bg-dark text-white"
                           />
@@ -3202,7 +3481,9 @@ const EndpointsPage = () => {
                 <p className="text-light mb-1">{selectedEndpoint.description || 'API endpoint'}</p>
                 <p className="text-muted small mb-0">
                   <i className="bi bi-info-circle me-1"></i>
-                  All requests to the API require authentication headers
+                  {skipAuth ? 
+                    'Example shown without authentication for demonstration purposes.' :
+                    'All requests to the API require authentication headers.'}
                 </p>
               </div>
               
@@ -3227,10 +3508,18 @@ const EndpointsPage = () => {
                 </h6>
                 <div className="bg-black p-3 rounded mb-2">
                   <pre className="text-info mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-{`Content-Type: application/json
+{skipAuth ? 
+`Content-Type: application/json
+X-Skip-Auth: true` : 
+`Content-Type: application/json
 Authorization: Bearer ${getAccessToken() || 'YOUR_ACCESS_TOKEN'}`}
                   </pre>
                 </div>
+                <p className="text-muted small mb-0">
+                  {skipAuth ? 
+                    <><i className="bi bi-unlock me-1"></i> Authentication is disabled. Using X-Skip-Auth header instead.</> : 
+                    <><i className="bi bi-lock me-1"></i> Authentication is required for this endpoint.</>}
+                </p>
               </div>
               
               <div>

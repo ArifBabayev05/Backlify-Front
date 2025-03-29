@@ -49,6 +49,18 @@ const SchemaPage = () => {
     const schemaData = sessionStorage.getItem('schemaData');
     const dataReady = sessionStorage.getItem('dataReady');
     
+    // Check if we're coming back from the endpoints page and need to reload
+    const reloadSchema = sessionStorage.getItem('reload_schema');
+    if (reloadSchema === 'true') {
+      console.log('Reload schema flag detected, refreshing schema data');
+      // Clear the flag
+      sessionStorage.removeItem('reload_schema');
+      
+      // Force schema reload by clearing the apiDataReceived flag
+      setApiDataReceived(false);
+      setIsLoading(true);
+    }
+    
     if (schemaData && !dataReady) {
       console.log('Auto-recovery: Setting dataReady flag because schema data exists');
       sessionStorage.setItem('dataReady', 'true');

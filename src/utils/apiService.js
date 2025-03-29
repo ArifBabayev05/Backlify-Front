@@ -1,5 +1,6 @@
 // API Service utility to handle requests and token management
 import { toast } from 'react-hot-toast';
+import { getCachedResponse, setCachedResponse, clearCache } from './cacheService';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -70,6 +71,15 @@ export const refreshAccessToken = async () => {
 export const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  // Check cache first for GET requests if caching is not explicitly disabled
+  if ((!options.method || options.method === 'GET') && !options.skipCache) {
+    const cachedResponse = getCachedResponse(endpoint, options);
+    if (cachedResponse) {
+      console.log(`[Cache] Using cached response for: ${endpoint}`);
+      return cachedResponse;
+    }
+  }
+  
   // Set up headers with authentication if token exists
   const headers = {
     'Content-Type': 'application/json',
@@ -127,6 +137,21 @@ export const apiRequest = async (endpoint, options = {}) => {
       throw error;
     }
 
+    // Cache successful GET responses if caching is not explicitly disabled
+    if ((!options.method || options.method === 'GET') && !options.skipCache) {
+      setCachedResponse(endpoint, options, data);
+    }
+
+    // If this was a mutation operation (POST, PUT, DELETE, etc), clear related cache entries
+    if (options.method && options.method !== 'GET') {
+      // Extract the base resource path to clear all related cache entries
+      const resourcePath = endpoint.split('/')[1]; // e.g., 'my-apis' from '/my-apis/123'
+      if (resourcePath) {
+        console.log(`[Cache] Clearing cache for resource: ${resourcePath}`);
+        clearCache(`/${resourcePath}`);
+      }
+    }
+
     return data;
   } catch (error) {
     console.error(`API request failed (${url}):`, error);
@@ -142,9 +167,13 @@ export const apiRequest = async (endpoint, options = {}) => {
 
 // Authentication-specific functions
 export const loginUser = async (credentials) => {
+  // Clear all cache on login to ensure fresh data
+  clearCache();
+  
   const data = await apiRequest('/auth/login', {
     method: 'POST',
     body: JSON.stringify(credentials),
+    skipCache: true, // Always skip cache for auth requests
   });
 
   // Store tokens securely in memory
@@ -161,6 +190,9 @@ export const loginUser = async (credentials) => {
 };
 
 export const logoutUser = async () => {
+  // Clear all cache on logout
+  clearCache();
+  
   // Clear tokens from memory
   clearTokens();
   
@@ -169,6 +201,7 @@ export const logoutUser = async () => {
     if (accessToken) {
       await apiRequest('/auth/logout', {
         method: 'POST',
+        skipCache: true, // Always skip cache for auth requests
       });
     }
   } catch (error) {
