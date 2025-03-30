@@ -312,7 +312,7 @@ const DashboardPage = () => {
                 }}>
                 <FaServer className="text-primary" size={20} />
               </div>
-              <h5 className="m-0 text-white d-none d-md-block">Backlify Admin</h5>
+              <h5 className="m-0 text-white d-none d-md-block">Backlify Dashboard</h5>
             </div>
             <div className="d-flex gap-2">
               {isAdmin && (
