@@ -71,16 +71,29 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }
       // Skip in readOnly mode
       if (readOnly) return;
       
+      console.log('Connection attempt:', params);
+      
       // Instead of automatically creating the edge, open the relationship manager
       const sourceNode = nodes.find(node => node.id === params.source);
       const targetNode = nodes.find(node => node.id === params.target);
       
       if (sourceNode && targetNode) {
+        // Create a temporary edge ID for tracking
+        const tempEdgeId = `temp-edge-${Date.now()}`;
+        console.log('Creating temporary edge with ID:', tempEdgeId);
+        
         setSelectedEdge({
+          id: tempEdgeId,
           source: params.source,
           target: params.target,
           sourceHandle: params.sourceHandle,
-          targetHandle: params.targetHandle
+          targetHandle: params.targetHandle,
+          data: {
+            // Default relationship type and fields - will be updated in relationship manager
+            relationship: 'one-to-many',
+            sourceField: 'id',
+            targetField: 'id'
+          }
         });
         setRelationshipManagerOpen(true);
       }
@@ -128,40 +141,49 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }
     const schemaEdges = [];
     
     schema.relationships.forEach((rel) => {
-      // Create a unique key for this relationship connection (sorted to ensure A→B and B→A create the same key)
-      const tables = [rel.source, rel.target].sort();
-      const fields = rel.source === tables[0] ? 
-        [rel.sourceField, rel.targetField] : 
-        [rel.targetField, rel.sourceField];
-      const connectionKey = `${tables[0]}-${tables[1]}-${fields[0]}-${fields[1]}`;
-      
-      // Only create the edge if we haven't processed this connection yet
-      if (!processedConnections.has(connectionKey)) {
-        processedConnections.add(connectionKey);
+      // Skip incomplete relationships
+      if (!rel.source || !rel.target || !rel.sourceField || !rel.targetField) {
+        console.warn('Skipping incomplete relationship:', rel);
+        return;
+      }
+
+      try {
+        // Create a unique key for this relationship connection
+        const connectionKey = `${rel.source}-${rel.target}-${rel.sourceField}-${rel.targetField}`;
         
-        schemaEdges.push({
-          id: `e-${rel.source}-${rel.target}`,
-          source: rel.source,
-          target: rel.target,
-          type: 'schemaEdge',
-          animated: true,
-          data: {
-            relationship: rel.type,
-            sourceField: rel.sourceField,
-            targetField: rel.targetField
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 15,
-            height: 15,
-            color: getRelationshipColor(rel.type),
-          },
-          style: { 
-            stroke: getRelationshipColor(rel.type), 
-            strokeWidth: 2,
-            strokeDasharray: rel.type === 'many-to-many' ? '5 5' : 'none'
-          },
-        });
+        // Only create the edge if we haven't processed this connection yet
+        if (!processedConnections.has(connectionKey)) {
+          processedConnections.add(connectionKey);
+          
+          const edgeId = `e-${rel.source}-${rel.target}-${rel.sourceField}-${rel.targetField}`;
+          
+          schemaEdges.push({
+            id: edgeId,
+            source: rel.source,
+            target: rel.target,
+            type: 'schemaEdge',
+            animated: rel.type === 'one-to-many',
+            data: {
+              relationship: rel.type || 'one-to-many', // Default to one-to-many if type is missing
+              sourceField: rel.sourceField,
+              targetField: rel.targetField
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 15,
+              height: 15,
+              color: getRelationshipColor(rel.type || 'one-to-many'),
+            },
+            style: { 
+              stroke: getRelationshipColor(rel.type || 'one-to-many'), 
+              strokeWidth: 2,
+              strokeDasharray: rel.type === 'many-to-many' ? '5 5' : 'none'
+            },
+          });
+          console.log(`Added edge: ${edgeId} (${rel.source} → ${rel.target})`);
+        }
+      } catch (error) {
+        console.error('Error creating edge for relationship:', error, rel);
       }
     });
     
@@ -352,7 +374,7 @@ const SchemaFlow = ({ schema, onModifyPrompt, onSchemaChange, readOnly = false }
       case 'many-to-many':
         return '#8b5cf6';
       default:
-        return '#10b981';
+        return '#10b981'; // Default color for any unrecognized or missing type
     }
   };
 

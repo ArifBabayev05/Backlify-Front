@@ -133,15 +133,19 @@ const SchemaPage = () => {
                 table.relationships.forEach(rel => {
                   try {
                     // Check that all required fields are present
-                    if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
+                    if (rel.targetTable && rel.sourceColumn && rel.targetColumn) {
+                      // Ensure relationship type is valid
+                      const validType = rel.type && ['one-to-one', 'one-to-many', 'many-to-many'].includes(rel.type)
+                        ? rel.type : 'one-to-many';
+                        
                       transformedSchema.relationships.push({
                         source: table.name,
                         target: rel.targetTable,
-                        type: rel.type,
+                        type: validType,
                         sourceField: rel.sourceColumn,
                         targetField: rel.targetColumn
                       });
-                      console.log(`Added relationship: ${table.name} -> ${rel.targetTable} (${rel.type})`);
+                      console.log(`Added relationship: ${table.name} -> ${rel.targetTable} (${validType})`);
                     } else {
                       console.warn('Skipping incomplete relationship:', rel);
                     }
@@ -542,11 +546,15 @@ const SchemaPage = () => {
       responseData.tables.forEach(table => {
         if (table.relationships && Array.isArray(table.relationships)) {
           table.relationships.forEach(rel => {
-            if (rel.targetTable && rel.type && rel.sourceColumn && rel.targetColumn) {
+            if (rel.targetTable && rel.sourceColumn && rel.targetColumn) {
+              // Ensure relationship type is valid
+              const validType = rel.type && ['one-to-one', 'one-to-many', 'many-to-many'].includes(rel.type)
+                ? rel.type : 'one-to-many';
+                
               transformedSchema.relationships.push({
                 source: table.name,
                 target: rel.targetTable,
-                type: rel.type,
+                type: validType,
                 sourceField: rel.sourceColumn,
                 targetField: rel.targetColumn
               });
