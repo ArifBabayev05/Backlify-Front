@@ -2,7 +2,7 @@
 import { toast } from 'react-hot-toast';
 import { getCachedResponse, setCachedResponse, clearCache } from './cacheService';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://backlify-v2.onrender.com';
 
 // In-memory token storage (more secure than localStorage for tokens)
 let accessToken = null;

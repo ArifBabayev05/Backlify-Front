@@ -59,7 +59,7 @@ A wrapper around `apiRequest` to make it easier to migrate existing code:
 
 ```javascript
 // Before (direct fetch)
-const response = await fetch('http://localhost:3000/my-endpoint', {
+const response = await fetch('https://backlify-v2.onrender.com/my-endpoint', {
   method: 'GET',
   headers: {
     'Content-Type': 'application/json'
@@ -69,7 +69,7 @@ const response = await fetch('http://localhost:3000/my-endpoint', {
 // After (with authentication)
 import fetchWithAuth from '../utils/fetchWithAuth';
 
-const data = await fetchWithAuth('http://localhost:3000/my-endpoint', {
+const data = await fetchWithAuth('https://backlify-v2.onrender.com/my-endpoint', {
   method: 'GET'
 });
 ```

@@ -9,7 +9,7 @@ import { apiRequest } from './apiService';
  */
 const fetchWithAuth = async (url, options = {}) => {
   // Extract the endpoint from the full URL
-  // This handles URLs like 'http://localhost:3000/my-apis'
+  // This handles URLs like 'https://backlify-v2.onrender.com/my-apis'
   const urlObj = new URL(url);
   const endpoint = urlObj.pathname;
   

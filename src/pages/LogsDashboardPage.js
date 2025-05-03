@@ -149,7 +149,7 @@ const LogsDashboardPage = () => {
       }
       
       // Append the query string to the URL
-      const response = await fetch(`http://localhost:3000/admin/logs?${queryParams.toString()}`, {
+      const response = await fetch(`https://backlify-v2.onrender.com/admin/logs?${queryParams.toString()}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -186,7 +186,7 @@ const LogsDashboardPage = () => {
       }
       
       // Append the query string to the URL
-      const response = await fetch(`http://localhost:3000/admin/logs/stats?${queryParams.toString()}`, {
+      const response = await fetch(`https://backlify-v2.onrender.com/admin/logs/stats?${queryParams.toString()}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -371,7 +371,7 @@ const LogsDashboardPage = () => {
         console.log(`Sending date filter to backend: ${formattedStartDate} to ${formattedEndDate}`);
       }
       
-      const url = `http://localhost:3000/admin/logs?${queryParams.toString()}`;
+      const url = `https://backlify-v2.onrender.com/admin/logs?${queryParams.toString()}`;
       console.log('Fetching user logs from:', url);
       
       const response = await fetch(url, {
@@ -446,7 +446,7 @@ const LogsDashboardPage = () => {
     
     try {
       // Try to get unique usernames from existing logs first as a more reliable approach
-      const response = await fetch(`http://localhost:3000/admin/logs`, {
+      const response = await fetch(`https://backlify-v2.onrender.com/admin/logs`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -468,7 +468,7 @@ const LogsDashboardPage = () => {
       }
       
       // Fallback to dedicated endpoint if first approach fails
-      const userSearchResponse = await fetch(`http://localhost:3000/admin/users/search?q=${encodeURIComponent(query)}`, {
+      const userSearchResponse = await fetch(`https://backlify-v2.onrender.com/admin/users/search?q=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

@@ -64,7 +64,7 @@ const RegisterPage = () => {
         password: formData.password
       };
 
-      const response = await fetch('http://localhost:3000/auth/register', {
+      const response = await fetch('https://backlify-v2.onrender.com/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

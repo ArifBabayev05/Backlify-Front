@@ -417,7 +417,7 @@ const EndpointsPage = () => {
       console.log('Loading endpoints for API ID:', selectedApiId);
       setApiId(selectedApiId);
       // Initialize the API base URL
-      setApiBaseUrl(`http://localhost:3000/api/${selectedApiId}`);
+      setApiBaseUrl(`https://backlify-v2.onrender.com/api/${selectedApiId}`);
       loadApiEndpoints(selectedApiId);
       
       // Load users data for relationship fields
@@ -469,35 +469,35 @@ const EndpointsPage = () => {
               path: `/${table}`,
               description: `List all ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table} (${authStatus})`
+              fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table} (${authStatus})`
             },
             {
               method: 'GET',
               path: `/${table}/:id`,
               description: `Get a single ${table} by ID`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id (${authStatus})`
+              fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table}/:id (${authStatus})`
             },
             {
               method: 'POST',
               path: `/${table}`,
               description: `Create a new ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table} (${authStatus})`
+              fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table} (${authStatus})`
             },
             {
               method: 'PUT',
               path: `/${table}/:id`,
               description: `Update an existing ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id (${authStatus})`
+              fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table}/:id (${authStatus})`
             },
             {
               method: 'DELETE',
               path: `/${table}/:id`,
               description: `Delete a ${table}`,
               auth: !skipAuth,
-              fullPath: `http://localhost:3000/api/${apiId}/${table}/:id (${authStatus})`
+              fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table}/:id (${authStatus})`
             }
           ]
         };
@@ -507,8 +507,8 @@ const EndpointsPage = () => {
       
       // Set endpoints data
       setEndpoints(transformedEndpoints);
-      setApiBaseUrl(`http://localhost:3000/api/${apiId}`);
-      setSwaggerUrl(`http://localhost:3000/api/${apiId}/docs/`);
+      setApiBaseUrl(`https://backlify-v2.onrender.com/api/${apiId}`);
+      setSwaggerUrl(`https://backlify-v2.onrender.com/api/${apiId}/docs/`);
       
       // Set the first table as selected by default if we have endpoints
       if (transformedEndpoints.length > 0) {
@@ -563,7 +563,7 @@ const EndpointsPage = () => {
         console.log('Storing API ID in localStorage from session data:', endpointsData.apiId);
         localStorage.setItem('selectedApiId', endpointsData.apiId);
         setApiId(endpointsData.apiId);
-        setApiBaseUrl(`http://localhost:3000/api/${endpointsData.apiId}`);
+        setApiBaseUrl(`https://backlify-v2.onrender.com/api/${endpointsData.apiId}`);
       } else {
         console.warn('No API ID found in endpoint data');
       }
@@ -640,10 +640,10 @@ const EndpointsPage = () => {
       
       // Set swagger URL if available
       if (endpointsData.swagger_url) {
-        setSwaggerUrl(`http://localhost:3000${endpointsData.swagger_url}`);
+        setSwaggerUrl(`https://backlify-v2.onrender.com${endpointsData.swagger_url}`);
       } else if (endpointsData.apiId) {
         // Create a default swagger URL based on the API ID
-        setSwaggerUrl(`http://localhost:3000/api/${endpointsData.apiId}/docs/`);
+        setSwaggerUrl(`https://backlify-v2.onrender.com/api/${endpointsData.apiId}/docs/`);
       }
       
       // Check if endpoints array exists and is valid
@@ -689,7 +689,7 @@ const EndpointsPage = () => {
               path: route.path,
               description,
               auth,
-              fullPath: `http://localhost:3000/api/${endpointsData.apiId}${route.path}`
+              fullPath: `https://backlify-v2.onrender.com/api/${endpointsData.apiId}${route.path}`
             };
           })
         };
@@ -1865,7 +1865,7 @@ const EndpointsPage = () => {
     // If we don't have definitions, try to get them from the API
     if (!apiBaseUrl && apiId) {
       // If apiBaseUrl is not set but we have apiId, set it
-      const newApiBaseUrl = `http://localhost:3000/api/${apiId}`;
+      const newApiBaseUrl = `https://backlify-v2.onrender.com/api/${apiId}`;
       console.log(`Setting API base URL to ${newApiBaseUrl}`);
       setApiBaseUrl(newApiBaseUrl);
     }
@@ -1876,7 +1876,7 @@ const EndpointsPage = () => {
       return inferDefaultSchema(tableName);
     }
     
-    const url = `${apiBaseUrl || `http://localhost:3000/api/${apiId}`}/${tableName}?limit=1`;
+    const url = `${apiBaseUrl || `https://backlify-v2.onrender.com/api/${apiId}`}/${tableName}?limit=1`;
     
     console.log(`Fetching schema for table: ${tableName}`);
     console.log(`Making schema discovery request to: ${url}`);
@@ -2122,7 +2122,7 @@ const EndpointsPage = () => {
   const generateCurlExample = (endpoint) => {
     if (!endpoint) {
       // Return a default example if endpoint is undefined
-      return `curl -X GET "http://localhost:3000/api/your-api-id/your-endpoint" \\
+      return `curl -X GET "https://backlify-v2.onrender.com/api/your-api-id/your-endpoint" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${getAccessToken() || 'YOUR_BEARER_TOKEN'}"`;
     }
@@ -2135,9 +2135,9 @@ const EndpointsPage = () => {
       // Remove the auth info from the fullPath
       url = endpoint.fullPath.split(' ')[0]; 
     } else if (endpoint.table) {
-      url = `http://localhost:3000/api/${apiId || 'your-api-id'}/${endpoint.table}`;
+      url = `https://backlify-v2.onrender.com/api/${apiId || 'your-api-id'}/${endpoint.table}`;
     } else {
-      url = 'http://localhost:3000/api/your-api-id/your-endpoint';
+      url = 'https://backlify-v2.onrender.com/api/your-api-id/your-endpoint';
     }
     
     let method = endpoint.method || 'GET';
@@ -2983,7 +2983,7 @@ const EndpointsPage = () => {
                                           method: endpoint.method || 'GET',
                                           path: endpoint.path || '',
                                           table: endpoint.table || endpoint.path?.split('/')[1] || '',
-                                          fullPath: endpoint.fullPath || `http://localhost:3000/api/${apiId}/${endpoint.table || ''}`,
+                                          fullPath: endpoint.fullPath || `https://backlify-v2.onrender.com/api/${apiId}/${endpoint.table || ''}`,
                                           description: endpoint.description || 'API endpoint',
                                           ...endpoint
                                         };
@@ -3496,7 +3496,7 @@ const EndpointsPage = () => {
                   <code className="text-success">
                     {selectedEndpoint.fullPath ? 
                       (selectedEndpoint.fullPath.split(' ')[0]) : 
-                      (`http://localhost:3000/api/${apiId}/${selectedEndpoint.table || ''}`)}
+                      (`https://backlify-v2.onrender.com/api/${apiId}/${selectedEndpoint.table || ''}`)}
                   </code>
                 </div>
               </div>
