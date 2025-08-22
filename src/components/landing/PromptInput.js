@@ -91,16 +91,9 @@ const PromptInput = ({ onGenerate }) => {
   };
 
   return (
-    <motion.div 
+    <div 
       className="position-relative"
       style={{ zIndex: 10 }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      whileHover={{ 
-        scale: 1.01, 
-        boxShadow: '0 15px 30px -12px rgba(59, 130, 246, 0.2)'
-      }}
     >
       <div 
         className="rounded-4 p-4 position-relative"
@@ -111,53 +104,7 @@ const PromptInput = ({ onGenerate }) => {
           overflow: 'hidden'
         }}
       >
-        {/* Glow effect */}
-        <motion.div 
-          className="position-absolute"
-          animate={{
-            opacity: [0.3, 0.5, 0.3],
-            scale: [1, 1.05, 1],
-          }}
-          transition={{
-            duration: 3,
-            ease: "easeInOut",
-            times: [0, 0.5, 1],
-            repeat: Infinity,
-          }}
-          style={{
-            top: '-80px',
-            left: '-60px',
-            width: '220px',
-            height: '220px',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0) 70%)',
-            filter: 'blur(30px)',
-            zIndex: 0
-          }}
-        />
-        
-        {/* Decorative element */}
-        <motion.div 
-          className="position-absolute top-0 end-0" 
-          style={{ 
-            width: '120px', 
-            height: '120px',
-            opacity: 0.7,
-            zIndex: 0,
-            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0) 70%)',
-            borderRadius: '50%',
-            filter: 'blur(20px)'
-          }}
-          animate={{
-            scale: [1, 1.1, 1],
-            opacity: [0.3, 0.4, 0.3]
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
+        {/* Reduced decorative effects to avoid performance overhead while typing */}
         
         <div className="position-relative" style={{ zIndex: 1 }}>
           <Form onSubmit={handleSubmit} className="mb-3">
@@ -181,11 +128,7 @@ const PromptInput = ({ onGenerate }) => {
               />
             </Form.Group>
             
-            <motion.div
-              whileHover={{ scale: isSubmitting ? 1 : 1.01 }}
-              whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
-              className="d-grid gap-2"
-            >
+            <div className="d-grid gap-2">
               <Button
                 type="submit"
                 variant="primary"
@@ -202,7 +145,7 @@ const PromptInput = ({ onGenerate }) => {
               >
                 {isSubmitting ? 'Generating...' : 'Generate Schema'}
               </Button>
-            </motion.div>
+            </div>
           </Form>
           
           <div className="mt-4">
@@ -296,7 +239,7 @@ const PromptInput = ({ onGenerate }) => {
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 

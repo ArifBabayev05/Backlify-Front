@@ -434,6 +434,7 @@ const DashboardPage = () => {
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
                   }}
+                  onClick={navigateToHome}
                 >
                   <FaPlus size={14} /> Create New API
                 </Button>

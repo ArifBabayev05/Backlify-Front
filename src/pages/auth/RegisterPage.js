@@ -91,7 +91,7 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center position-relative overflow-hidden">
+    <div className="register-page-wrapper min-vh-100 position-relative" style={{ minHeight: '100vh', overflowY: 'auto' }}>
       {/* Background elements */}
       <div className="position-absolute w-100 h-100" style={{ zIndex: 0, top: 0, left: 0 }}>
         <motion.div 
@@ -136,18 +136,22 @@ const RegisterPage = () => {
         />
       </div>
 
-      <Container className="py-5 position-relative" style={{ zIndex: 1, maxWidth: '520px' }}>
+      <Container className="py-4 px-2 px-sm-4 position-relative d-flex flex-column justify-content-center align-items-center w-100" style={{ zIndex: 1, minHeight: '100vh', maxWidth: '100vw', width: '100%' }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          style={{ width: '100%', maxWidth: 520, minWidth: 0 }}
         >
           <div 
-            className="rounded-4 p-4 p-md-5 position-relative"
+            className="rounded-4 p-3 p-md-4 p-lg-5 position-relative"
             style={{
               background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9))',
               backdropFilter: 'blur(10px)',
               border: '1px solid rgba(59, 130, 246, 0.1)',
+              width: '100%',
+              maxWidth: 520,
+              minWidth: 0
             }}
           >
             <div className="text-center mb-4">

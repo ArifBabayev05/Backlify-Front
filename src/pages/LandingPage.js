@@ -35,7 +35,7 @@ const itemVariants = {
 };
 
 const particleConfig = {
-  count: 30,
+  count: 12,
   size: [2, 8],
   speed: [0.2, 0.8],
   colors: ['#3b82f6', '#4f46e5', '#10b981', '#8b5cf6'],
@@ -43,7 +43,6 @@ const particleConfig = {
 
 const LandingPage = () => {
   const [particles, setParticles] = useState([]);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -61,11 +60,6 @@ const LandingPage = () => {
     }
   ];
 
-  // Handle mouse movement for 3D effect
-  const handleMouseMove = (e) => {
-    setMousePosition({ x: e.clientX, y: e.clientY });
-  };
-
   // Generate floating particles
   useEffect(() => {
     const newParticles = Array.from({ length: particleConfig.count }, () => ({
@@ -80,33 +74,6 @@ const LandingPage = () => {
     
     setParticles(newParticles);
   }, []);
-
-  // Track mouse position for 3D effect
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  // Calculate 3D transform based on mouse position
-  const calculate3DTransform = (depth = 5) => {
-    if (!mousePosition.x || !mousePosition.y) return {};
-    
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    
-    // Calculate rotation values
-    let rotateY = -((mousePosition.x - centerX) / centerX) * depth;
-    let rotateX = ((mousePosition.y - centerY) / centerY) * depth;
-    
-    // Limit maximum rotation angles to prevent extreme effects at corners
-    const maxAngle = 2;
-    rotateY = Math.max(Math.min(rotateY, maxAngle), -maxAngle);
-    rotateX = Math.max(Math.min(rotateX, maxAngle), -maxAngle);
-    
-    return {
-      transition: 'transform 0.1s ease-out'
-    };
-  };
 
   // Handle API response and navigate to schema page
   const handleGenerateSchema = (prompt) => {
@@ -151,7 +118,6 @@ const LandingPage = () => {
   return (
     <div 
       className="min-vh-100 d-flex flex-column align-items-center justify-content-center p-4 position-relative overflow-hidden"
-      onMouseMove={handleMouseMove}
     >
       {/* Animated particles background */}
       <div className="position-absolute w-100 h-100" style={{ top: 0, left: 0, zIndex: 1, overflow: 'hidden' }}>

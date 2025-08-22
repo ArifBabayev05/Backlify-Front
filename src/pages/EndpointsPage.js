@@ -77,7 +77,7 @@ const EndpointsPage = () => {
   const [skipAuth, setSkipAuth] = useState(false);
   const [showSkipAuthWarning, setShowSkipAuthWarning] = useState(false);
   // Make sure we capture the endpoint origin (where the user came from)
-  const [originPage, setOriginPage] = useState(localStorage.getItem('endpoint_origin') || 'dashboard');
+  const [originPage, setOriginPage] = useState(localStorage.getItem('endpoint_origin') || 'generate');
   const backButtonLabel = originPage === 'dashboard' ? 'Back to Dashboard' : 'Back to Schema';
   
   // Format conversion helpers
@@ -426,7 +426,7 @@ const EndpointsPage = () => {
       // No data and not loading - redirect to dashboard
       console.log('No API ID or session data, redirecting to dashboard');
       setIsLoading(false);
-      navigate('/dashboard');
+      navigate('/');
     }
   }, [navigate]);
 
@@ -881,10 +881,10 @@ const EndpointsPage = () => {
   const handleGoBack = () => {
     console.log(`Navigating back to ${originPage} page`);
     
-    if (originPage === 'dashboard') {
+    if (originPage === 'generate') {
       // When going back to dashboard, set a flag to refresh it to show the latest APIs
       localStorage.setItem('refresh_dashboard', 'true');
-      navigate('/dashboard');
+      navigate('/generate');
     } else {
       // When going back to schema, set a flag to reload schema data if needed
       sessionStorage.setItem('reload_schema', 'true');

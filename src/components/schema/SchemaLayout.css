@@ -12,13 +12,7 @@
   bottom: 0;
 }
 
-/* Additional styles to ensure no element overflows its container */
-body, html {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden; /* Ensures no scroll bars are visible */
-}
+/* Remove global scroll locking; scope overflow to schema container only */
 
 /* Schema visualization area */
 .react-flow-wrapper {

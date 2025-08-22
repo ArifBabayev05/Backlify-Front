@@ -90,7 +90,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center position-relative">
+    <div className="login-page-wrapper min-vh-100 position-relative" style={{ minHeight: '100vh', overflowY: 'auto' }}>
       {/* Simple background */}
       <div className="position-fixed w-100 h-100" style={{ 
         zIndex: -1, 
@@ -99,19 +99,23 @@ const LoginPage = () => {
         left: 0
       }}></div>
 
-      <Container className="py-5 position-relative" style={{ zIndex: 1, maxWidth: '480px' }}>
+      <Container className="py-4 px-2 px-sm-4 position-relative d-flex flex-column justify-content-center align-items-center w-100" style={{ zIndex: 1, minHeight: '100vh', maxWidth: '100vw', width: '100%' }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          style={{ width: '100%', maxWidth: 480, minWidth: 0 }}
         >
           <div 
-            className="rounded-4 p-4 p-md-5 position-relative"
+            className="rounded-4 p-3 p-md-4 p-lg-5 position-relative"
             style={{
               background: 'rgba(30, 41, 59, 0.6)',
               backdropFilter: 'blur(8px)',
               border: '1px solid rgba(59, 130, 246, 0.1)',
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+              width: '100%',
+              maxWidth: 480,
+              minWidth: 0
             }}
           >
             <div className="text-center mb-4">

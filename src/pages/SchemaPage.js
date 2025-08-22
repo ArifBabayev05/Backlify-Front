@@ -605,31 +605,7 @@ const SchemaPage = () => {
     setSidebarOpen(prev => !prev);
   };
 
-  // Add this useEffect to prevent scrolling
-  useEffect(() => {
-    // Function to prevent scrolling
-    const preventScroll = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    };
-    
-    // Apply to document
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    
-    // Disable wheel events
-    document.addEventListener('wheel', preventScroll, { passive: false });
-    document.addEventListener('touchmove', preventScroll, { passive: false });
-    
-    return () => {
-      // Clean up
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-      document.removeEventListener('wheel', preventScroll);
-      document.removeEventListener('touchmove', preventScroll);
-    };
-  }, []);
+  // Remove global scroll locking: keep page scroll enabled
 
   return (
     <div 
