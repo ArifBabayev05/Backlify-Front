@@ -2,6 +2,8 @@ import React, { useState,useEffect, useRef  } from "react";
 import { Navbar, Nav, Container, Button, Row, Col, Card, Modal, Accordion, Form  } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { toast } from 'react-hot-toast'; // Bildirişlər üçün
+import backlifyIcon from '../assets/icons/backlify.png';
+import subscriptionService from '../utils/subscriptionService';
 
 // Using Bootstrap Icons and Unicode symbols instead of Font Awesome
 
@@ -13,6 +15,8 @@ const IntroPage = () => {
   const [loopKey, setLoopKey] = useState(0);
   const [contactForm, setContactForm] = useState({ email: '', message: '' });
   const [isSending, setIsSending] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   // Animasiya mərhələlərini idarə etmək üçün useEffect
   useEffect(() => {
     const runAnimationCycle = () => {
@@ -50,6 +54,24 @@ const IntroPage = () => {
         timeoutIds.current.forEach(clearTimeout);
     };
 }, []);
+
+  // Load subscription plans
+  useEffect(() => {
+    const loadSubscriptionPlans = async () => {
+      try {
+        setPlansLoading(true);
+        const plans = await subscriptionService.getSubscriptionPlans();
+        setSubscriptionPlans(plans);
+      } catch (error) {
+        console.error('Error loading subscription plans:', error);
+        toast.error('Failed to load pricing plans');
+      } finally {
+        setPlansLoading(false);
+      }
+    };
+
+    loadSubscriptionPlans();
+  }, []);
 
 const handleContactChange = (e) => {
   const { name, value } = e.target;
@@ -92,7 +114,7 @@ const handleContactChange = (e) => {
       --card-bg: rgba(31, 41, 55, 0.3);
       --text-primary: #f9fafb;
       --text-secondary: #9ca3af;
-      --text-muted: #6b7280;
+      --text-white: #6b7280;
       --border-color: rgba(255, 255, 255, 0.1);
     }
 
@@ -140,32 +162,38 @@ const handleContactChange = (e) => {
       box-shadow: 0 20px 50px rgba(0,0,0,0.3);
     }
     
+        /* === Düzəliş Edilmiş Typing Animasiyası === */
     .prompt-box {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1.25rem;
-      font-family: 'Fira Code', 'Menlo', monospace;
-      font-size: 0.95rem;
-      color: #c4b5fd;
+        background: rgba(0,0,0,0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        font-family: 'Fira Code', monospace;
+        color: #c4b5fd;
+        width: 100%;
+        overflow-x: auto; /* Daşma zamanı scroll etməyə imkan verir */
+        scrollbar-width: none; /* Firefox üçün scrollbar'ı gizlədir */
     }
-      @keyframes typing {
-      from { width: 0; }
-      to { width: 100%; }
-    }
-    @keyframes blink-caret {
-      from, to { border-color: transparent; }
-      50% { border-color: #c4b5fd; }
+    .prompt-box::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera üçün scrollbar'ı gizlədir */
     }
     .typing-effect {
-      display: inline-block;
-      overflow: hidden;
-      white-space: nowrap;
-      border-right: .15em solid #c4b5fd;
-      animation: typing 3.5s steps(55) forwards, 
-             blink-caret .75s step-end infinite;
-      width: 0;
+        display: inline-block;
+        white-space: nowrap; /* Mətni bir sətirdə saxlayır */
+        border-right: .15em solid #c4b5fd;
+        vertical-align: middle;
+        width: 0;
+        animation: typing 3.5s steps(55) forwards, blink-caret .75s step-end infinite;
     }
+    @keyframes typing {
+        from { width: 0; }
+        to { width: 55ch; } /* Konteynerin eninə deyil, mətnin uzunluğuna görə animasiya */
+    }
+    @keyframes blink-caret {
+        from, to { border-color: transparent }
+        50% { border-color: #c4b5fd; }
+    }
+   
+    
     
     .ai-processor {
       display: flex;
@@ -603,7 +631,7 @@ const handleContactChange = (e) => {
     }
     .prompt-arrow {
       font-size: 2rem;
-      color: var(--text-muted);
+      color: var(--text-white);
       margin: 1.5rem 0;
       transform: rotate(90deg);
     }
@@ -751,8 +779,7 @@ const handleContactChange = (e) => {
     .footer-links:hover { color: var(--text-primary); }
     .social-icon {
       width: 40px; height: 40px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color);
+      
       border-radius: 10px;
       display: flex;
       align-items: center;
@@ -762,7 +789,7 @@ const handleContactChange = (e) => {
       transition: all 0.3s ease;
     }
     .social-icon:hover {
-      background: var(--primary-gradient);
+      
       color: white;
       transform: translateY(-3px);
     }
@@ -780,6 +807,74 @@ const handleContactChange = (e) => {
         filter: invert(1) grayscale(100%) brightness(200%);
     }
 
+    /* About Us Section Styles */
+    .about-content {
+      padding-right: 2rem;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-item h4 {
+      font-size: 2rem;
+      font-weight: 800;
+    }
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    .team-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(12px);
+    }
+    .team-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(99, 102, 241, 0.5);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    }
+    .team-avatar {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    .mission-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 3rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    }
+    .values-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+    .value-item {
+      text-align: center;
+      padding: 1.5rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+    .value-item:hover {
+      transform: translateY(-3px);
+      border-color: rgba(99, 102, 241, 0.3);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+    .value-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
     /* Responsive adjustments */
     @media (max-width: 991px) {
       .navbar-collapse {
@@ -794,6 +889,14 @@ const handleContactChange = (e) => {
       .hero-section { text-align: center; }
       .hero-subtitle { margin-left: auto; margin-right: auto; }
       .d-flex.gap-3 { justify-content: center; }
+      .about-content { padding-right: 0; margin-bottom: 3rem; }
+      .team-grid { grid-template-columns: 1fr; }
+      .values-grid { grid-template-columns: repeat(2, 1fr); }
+      .mission-card { padding: 2rem; }
+    }
+    @media (max-width: 576px) {
+      .values-grid { grid-template-columns: 1fr; }
+      .d-flex.gap-4 { flex-direction: column; gap: 1.5rem !important; }
     }
       .faq-accordion .accordion-item {
     background-color: var(--card-bg);
@@ -921,16 +1024,26 @@ const renderAnimationStage = () => (
       {/* Navigation */}
       <Navbar expand="lg" className="navbar-custom fixed-top" variant="dark">
         <Container>
-                     <Navbar.Brand href="#" className="gradient-text">
-             ⚡ Backlify
+                     <Navbar.Brand href="#" className="gradient-text d-flex align-items-center">
+             <img 
+               src={backlifyIcon} 
+               alt="Backlify Logo" 
+               width="24" 
+               height="24" 
+               className="me-2"
+               style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(78%) saturate(2476%) hue-rotate(235deg) brightness(102%) contrast(97%)' }}
+             /> 
+             Backlify
            </Navbar.Brand>
           <Navbar.Toggle aria-controls="navbarNav" />
           <Navbar.Collapse id="navbarNav">
             <Nav className="mx-auto gap-2">
               <Nav.Link href="#features">Features</Nav.Link>
               <Nav.Link href="#how-it-works">How It Works</Nav.Link>
+              <Nav.Link href="#about">About</Nav.Link>
               <Nav.Link href="#pricing">Pricing</Nav.Link>
               <Nav.Link href="#faq">FAQ</Nav.Link>
+              <Nav.Link href="/privacy">Privacy</Nav.Link>
             </Nav>
             <div className="d-flex gap-3 flex-column flex-lg-row align-items-center mt-3 mt-lg-0">
               <Button variant="outline-light" href="/login" className="rounded-pill d-none d-lg-block">Log In</Button>
@@ -948,7 +1061,7 @@ const renderAnimationStage = () => (
           <Row className="align-items-center gy-5">
             <Col lg={6} className="text-center text-lg-start">
               <h1 className="hero-title">
-                Less Code, <span className="gradient-text">Build More.</span> <br />Instantly.
+                Less Code, <span className="gradient-text">Build Fast.</span> <br />Instantly.
               </h1>
               <p className="hero-subtitle mx-auto mx-lg-0">
                 Backlify is the AI-powered platform that eliminates the need for backend coding. Simply describe your idea, and let our AI generate the database schema and ready-to-use APIs for you.
@@ -1056,57 +1169,159 @@ const renderAnimationStage = () => (
         </Container>
       </section>
       
-      {/* Pricing Section */}
-      <section id="pricing" className="section-padding">
+      {/* About Us Section */}
+      <section id="about" className="section-padding" style={{ background: "rgba(255, 255, 255, 0.02)" }}>
         <Container>
           <div className="section-header text-center">
-            <h2 className="section-title">Simple Pricing for <span className="gradient-text">Every Need</span></h2>
-            <p className="section-subtitle">Choose the plan that fits your project. Scale as you grow. No hidden fees.</p>
+            <h2 className="section-title">About <span className="gradient-text">Backlify</span></h2>
+            <p className="section-subtitle">
+              We're on a mission to democratize backend development and make it accessible to everyone.
+            </p>
           </div>
-          <Row className="g-4 justify-content-center">
-            <Col md={6} lg={4}>
-              <div className="pricing-card">
-                <h5 className="mb-3">Hobby</h5>
-                <div className="price mb-3 gradient-text">$0<span className="text-secondary fs-5">/mo</span></div>
-                <ul className="list-unstyled text-secondary">
-                                     <li className="mb-2">✅ 1 Project</li>
-                   <li className="mb-2">✅ Unlimited API Calls</li>
-                   <li className="mb-2">✅ AI Schema Builder</li>
-                   <li className="mb-2">✅ Community Support</li>
-                </ul>
-                <a href="/register" className="btn-outline-custom w-100 mt-auto" onClick={handleStartClick}>Start for Free</a>
+          <Row className="g-5 align-items-center">
+            <Col lg={6}>
+              <div className="about-content">
+                <h3 className="mb-4 text-white">Our Story</h3>
+                <p className="text-secondary mb-4">
+                  Backlify was born from a simple observation: while frontend development has become increasingly visual and accessible, 
+                  backend development remains complex and time-consuming. We believe that great ideas shouldn't be held back by technical barriers.
+                </p>
+                <p className="text-secondary mb-4">
+                  Our team of experienced developers and AI researchers came together to create a platform that bridges this gap. 
+                  We've combined cutting-edge artificial intelligence with intuitive design to make backend development as simple as describing your idea.
+                </p>
+                <div className="d-flex gap-4 mb-4">
+                  <div className="stat-item">
+                    <h4 className="gradient-text mb-1">10K+</h4>
+                    <p className="text-secondary small mb-0">APIs Generated</p>
+                  </div>
+                  <div className="stat-item">
+                    <h4 className="gradient-text mb-1">500+</h4>
+                    <p className="text-secondary small mb-0">Happy Developers</p>
+                  </div>
+                  <div className="stat-item">
+                    <h4 className="gradient-text mb-1">99.9%</h4>
+                    <p className="text-secondary small mb-0">Uptime</p>
+                  </div>
+                </div>
               </div>
             </Col>
-            <Col md={6} lg={4}>
-              <div className="pricing-card popular">
-                <div className="popular-badge">Most Popular</div>
-                <h5 className="mb-3">Pro</h5>
-                <div className="price mb-3 gradient-text">$29<span className="text-secondary fs-5">/mo</span></div>
-                <ul className="list-unstyled text-secondary">
-                                     <li className="mb-2">✅ 10 Projects</li>
-                   <li className="mb-2">✅ Everything in Hobby</li>
-                   <li className="mb-2">✅ Custom Domain</li>
-                   <li className="mb-2">✅ Priority Email Support</li>
-                </ul>
-                <a href="/register" className="btn-gradient w-100 mt-auto" onClick={handleStartClick}>Choose Plan</a>
+            <Col lg={6}>
+              <div className="about-visual">
+                <div className="team-grid">
+                  <div className="team-card">
+                    <div className="team-avatar">👨‍💻</div>
+                    <h6 className="text-white mb-1">AI Engineers</h6>
+                    <p className="text-secondary small">Building the future of development</p>
+                  </div>
+                  <div className="team-card">
+                    <div className="team-avatar">🎨</div>
+                    <h6 className="text-white mb-1">UX Designers</h6>
+                    <p className="text-secondary small">Creating intuitive experiences</p>
+                  </div>
+                  <div className="team-card">
+                    <div className="team-avatar">🔧</div>
+                    <h6 className="text-white mb-1">DevOps Experts</h6>
+                    <p className="text-secondary small">Ensuring reliability & scale</p>
+                  </div>
+                  <div className="team-card">
+                    <div className="team-avatar">🚀</div>
+                    <h6 className="text-white mb-1">Product Team</h6>
+                    <p className="text-secondary small">Driving innovation forward</p>
+                  </div>
+                </div>
               </div>
             </Col>
-            <Col md={6} lg={4}>
-              <div className="pricing-card">
-                <h5 className="mb-3">Business</h5>
-                <div className="price mb-3 gradient-text">Custom</div>
-                <ul className="list-unstyled text-secondary">
-                                     <li className="mb-2">✅ Unlimited Projects</li>
-                   <li className="mb-2">✅ Everything in Pro</li>
-                   <li className="mb-2">✅ Custom Integrations</li>
-                   <li className="mb-2">✅ 24/7 Live Support</li>
-                </ul>
-                <a href="#contact" className="btn-outline-custom w-100 mt-auto">Contact Sales</a>
+          </Row>
+          <Row className="mt-5">
+            <Col lg={12}>
+              <div className="mission-statement">
+                <div className="mission-card">
+                  <h4 className="text-white mb-3">Our Mission</h4>
+                  <p className="text-secondary mb-4">
+                    To eliminate the complexity of backend development and empower creators, entrepreneurs, and developers 
+                    to focus on what matters most: building amazing products that solve real-world problems.
+                  </p>
+                  <div className="values-grid">
+                    <div className="value-item">
+                      <div className="value-icon">🎯</div>
+                      <h6 className="text-white mb-2">Innovation</h6>
+                      <p className="text-secondary small">Pushing the boundaries of what's possible with AI</p>
+                    </div>
+                    <div className="value-item">
+                      <div className="value-icon">🤝</div>
+                      <h6 className="text-white mb-2">Accessibility</h6>
+                      <p className="text-secondary small">Making advanced technology available to everyone</p>
+                    </div>
+                    <div className="value-item">
+                      <div className="value-icon">⚡</div>
+                      <h6 className="text-white mb-2">Speed</h6>
+                      <p className="text-secondary small">Delivering results in minutes, not months</p>
+                    </div>
+                    <div className="value-item">
+                      <div className="value-icon">🛡️</div>
+                      <h6 className="text-white mb-2">Reliability</h6>
+                      <p className="text-secondary small">Enterprise-grade security and performance</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </Col>
           </Row>
         </Container>
       </section>
+{/* Pricing Section */}
+<section id="pricing" className="section-padding">
+  <Container>
+    <div className="section-header text-center">
+      <h2 className="section-title">Simple Pricing for <span className="gradient-text">Every Need</span></h2>
+      <p className="section-subtitle">Choose the plan that fits your project. Scale as you grow. No hidden fees.</p>
+    </div>
+    
+    {plansLoading ? (
+      <div className="text-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="text-secondary mt-3">Loading pricing plans...</p>
+      </div>
+    ) : (
+      <Row className="g-4 justify-content-center">
+        {subscriptionPlans.map((plan, index) => (
+          <Col md={6} lg={4} key={plan.id}>
+            <div className={`pricing-card ${plan.id === 'pro' ? 'popular' : ''}`}>
+              {plan.id === 'pro' && <div className="popular-badge">Most Popular</div>}
+              <h5 className="mb-3">{plan.name}</h5>
+              <div className="price mb-3 gradient-text">
+                {subscriptionService.formatPrice(plan.price, plan.currency)}
+                {plan.price > 0 && <span className="text-secondary fs-5">/mo</span>}
+              </div>
+              <p className="text-white small mb-3">
+                {plan.id === 'basic' && 'Perfect for getting started'}
+                {plan.id === 'pro' && 'For growing applications'}
+                {plan.id === 'enterprise' && 'For advanced functionality'}
+              </p>
+              <ul className="list-unstyled text-secondary">
+                {plan.features.map((feature, featureIndex) => (
+                  <li key={featureIndex} className="mb-2">
+                    <span className="text-success me-2">•</span>{feature}
+                  </li>
+                ))}
+              </ul>
+              <a 
+                href={plan.price === 0 ? "/register" : "/payment/plans"} 
+                className={`${plan.id === 'pro' ? 'btn-gradient' : 'btn-outline-custom'} w-100 mt-auto`} 
+                onClick={handleStartClick}
+              >
+                {plan.price === 0 ? 'Start for Free' : 'Choose Plan'}
+              </a>
+            </div>
+          </Col>
+        ))}
+      </Row>
+    )}
+  </Container>
+</section>
 
       {/* Testimonials Section */}
       {/* <section id="testimonials" className="section-padding">
@@ -1119,7 +1334,7 @@ const renderAnimationStage = () => (
               <Card className="testimonial-card h-100">
                 <blockquote className="mb-4 text-secondary fst-italic">"Backlify changed the game for us. What used to take weeks of backend development now takes a few hours. Absolutely brilliant!"</blockquote>
                 <div className="d-flex align-items-center">
-                  <img src="https://i.pravatar.cc/50?img=1" alt="Alex Chen" className="avatar me-3" />
+                  <img src="https://i.pravatar.cc/50?img=1" alt="Alex Chen - VP Engineering at TechCorp" className="avatar me-3" loading="lazy" width="50" height="50" />
                   <div>
                     <h6 className="mb-0 text-white">Alex Chen</h6>
                     <small className="text-light">VP Engineering, TechCorp</small>
@@ -1131,7 +1346,7 @@ const renderAnimationStage = () => (
               <Card className="testimonial-card h-100">
                 <blockquote className="mb-4 text-secondary fst-italic">"The AI schema generation is magical. Now our entire team can rapidly prototype ideas, not just our backend engineers."</blockquote>
                 <div className="d-flex align-items-center">
-                  <img src="https://i.pravatar.cc/50?img=2" alt="Sarah Johnson" className="avatar me-3" />
+                  <img src="https://i.pravatar.cc/50?img=2" alt="Sarah Johnson - CTO at StartupHub" className="avatar me-3" loading="lazy" width="50" height="50" />
                   <div>
                     <h6 className="mb-0 text-white">Sarah Johnson</h6>
                     <small className="text-light">CTO, StartupHub</small>
@@ -1143,7 +1358,7 @@ const renderAnimationStage = () => (
               <Card className="testimonial-card h-100">
                 <blockquote className="mb-4 text-secondary fst-italic">"The security and scalability were critical for us. We scaled our startup quickly with Backlify without worrying about infrastructure."</blockquote>
                 <div className="d-flex align-items-center">
-                  <img src="https://i.pravatar.cc/50?img=3" alt="Mike Kim" className="avatar me-3" />
+                  <img src="https://i.pravatar.cc/50?img=3" alt="Mike Kim - Founder at AppBuilders" className="avatar me-3" loading="lazy" width="50" height="50" />
                   <div>
                     <h6 className="mb-0 text-white">Mike Kim</h6>
                     <small className="text-light">Founder, AppBuilders</small>
@@ -1154,6 +1369,8 @@ const renderAnimationStage = () => (
           </Row>
         </Container>
       </section> */}
+      
+
       
 
       {/* Final CTA Section */}
@@ -1195,7 +1412,7 @@ const renderAnimationStage = () => (
                         <Accordion.Header>How does pricing work?</Accordion.Header>
                         <Accordion.Body>
                             Backlify follows a usage-based pricing model.  
-                            Your first <b>500 API requests are free</b>. After that, you only pay for what you use – making it cost-effective for both small projects and enterprise applications.
+                            Your first <b>1K API requests are free</b>. After that, you only pay for what you use – making it cost-effective for both small projects and enterprise applications.
                         </Accordion.Body>
                     </Accordion.Item>
                     <Accordion.Item eventKey="4">
@@ -1270,48 +1487,23 @@ const renderAnimationStage = () => (
       {/* Footer */}
       <footer className="footer">
         <Container>
-          <Row className="g-4">
-            <Col lg={4} md={6}>
-                             <a href="#" className="navbar-brand gradient-text mb-3 d-inline-block">
-                 ⚡ Backlify
+          <Row className="g-4" style={{justifyContent:"center", textAlign:"center"}}>
+            <Col lg={4} md={6} style={{justifyContent:"center", textAlign:"center"}}>
+                             <a href="#" style={{justifyContent:"center", textAlign:"center"}} className="navbar-brand gradient-text mb-3 d-inline-block d-flex align-items-center">
+                 <img 
+                   src={backlifyIcon} 
+                   alt="Backlify Logo" 
+                   width="20" 
+                   height="20" 
+                   className="me-2"
+                   style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(78%) saturate(2476%) hue-rotate(235deg) brightness(102%) contrast(97%)' }}
+                 />
+                 Backlify
                </a>
               <p className="text-secondary mb-4">The platform that makes backend creation visual and effortless. Build professional APIs without coding.</p>
-              <div className="d-flex gap-2">
-                                 <a href="#" className="social-icon">🐦</a>
-                 <a href="#" className="social-icon">💼</a>
-                 <a href="#" className="social-icon">📚</a>
+              <div className="d-flex gap-2" style={{justifyContent:"center", textAlign:"cente"}}>
+                <a href="https://www.linkedin.com/company/backlify-ai" className="social-icon"><img className="social-icon" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/LinkedIn_icon_circle.svg/640px-LinkedIn_icon_circle.svg.png" alt="Backlify LinkedIn Company Page" loading="lazy" width="24" height="24"/></a>
               </div>
-            </Col>
-            <Col lg={2} md={3} sm={6}>
-              <h6 className="text-white fw-semibold mb-3">Product</h6>
-              <ul className="list-unstyled">
-                <li className="mb-2"><a href="#features" className="footer-links">Features</a></li>
-                <li className="mb-2"><a href="#pricing" className="footer-links">Pricing</a></li>
-                <li className="mb-2"><a href="#" className="footer-links">Documentation</a></li>
-              </ul>
-            </Col>
-            <Col lg={2} md={3} sm={6}>
-              <h6 className="text-white fw-semibold mb-3">Company</h6>
-              <ul className="list-unstyled">
-                <li className="mb-2"><a href="#" className="footer-links">About Us</a></li>
-                <li className="mb-2"><a href="#" className="footer-links">Blog</a></li>
-                <li className="mb-2"><a href="#" className="footer-links">Careers</a></li>
-              </ul>
-            </Col>
-            <Col lg={2} md={3} sm={6}>
-              <h6 className="text-white fw-semibold mb-3">Support</h6>
-              <ul className="list-unstyled">
-                <li className="mb-2"><a href="#" className="footer-links">Help Center</a></li>
-                <li className="mb-2"><a href="#" className="footer-links">Status</a></li>
-                <li className="mb-2"><a href="#" className="footer-links">Contact Us</a></li>
-              </ul>
-            </Col>
-             <Col lg={2} md={3} sm={6}>
-              <h6 className="text-white fw-semibold mb-3">Legal</h6>
-              <ul className="list-unstyled">
-                <li className="mb-2"><a href="#" className="footer-links">Privacy</a></li>
-                <li className="mb-2"><a href="#" className="footer-links">Terms</a></li>
-              </ul>
             </Col>
           </Row>
           <hr className="my-4" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }} />
@@ -1320,7 +1512,7 @@ const renderAnimationStage = () => (
               <p className="text-secondary small mb-0">© {new Date().getFullYear()} Backlify. All rights reserved.</p>
             </Col>
             <Col md={6} className="text-md-end">
-              <p className="text-secondary small mb-0">Made with ❤️ in Azerbaijan 🇦🇿</p>
+              <p className="text-secondary small mb-0">Less Code, <span className="gradient-text">Build Fast.</span></p>
             </Col>
           </Row>
         </Container>

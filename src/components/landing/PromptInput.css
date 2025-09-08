@@ -4,6 +4,22 @@
   opacity: 1 !important;
 }
 
+/* Ensure text cursor for the prompt textarea */
+.prompt-textarea,
+.prompt-textarea:hover,
+.prompt-textarea:focus,
+.prompt-textarea:active {
+  cursor: text !important;
+}
+
+/* Override any global cursor styles for the prompt textarea */
+div .prompt-textarea,
+textarea.prompt-textarea,
+.form-control.prompt-textarea {
+  cursor: text !important;
+  caret-color: white !important;
+}
+
 /* Ensure focus doesn't add unwanted effects */
 .prompt-textarea:focus {
   box-shadow: none !important;

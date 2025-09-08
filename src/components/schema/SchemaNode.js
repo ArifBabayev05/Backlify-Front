@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useMemo, useCallback } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Badge } from 'react-bootstrap';
 import { motion } from 'framer-motion';
 import './SchemaNode.css';
 import './SchemaLayout.css';
 
-const SchemaNode = ({ data, selected }) => {
+const SchemaNode = memo(({ data, selected }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   
   // Extract fields from data
   const { label, fields = [], tableName } = data;
 
-  // Function to get icon color for field types
-  const getFieldTypeColor = (fieldType) => {
+  // Function to get icon color for field types - memoized
+  const getFieldTypeColor = useCallback((fieldType) => {
     if (fieldType && fieldType.toLowerCase().includes('uuid')) {
       return '#3b82f6'; // blue for uuid
     } else if (fieldType && fieldType.toLowerCase().includes('int')) {
@@ -23,11 +23,13 @@ const SchemaNode = ({ data, selected }) => {
     } else {
       return '#8b5cf6'; // purple for others
     }
-  };
+  }, []);
 
-  // Count the number of primary and foreign keys
-  const primaryKeyCount = fields.filter(f => f.isPrimary).length;
-  const foreignKeyCount = fields.filter(f => f.isForeign).length;
+  // Count the number of primary and foreign keys - memoized
+  const { primaryKeyCount, foreignKeyCount } = useMemo(() => ({
+    primaryKeyCount: fields.filter(f => f.isPrimary).length,
+    foreignKeyCount: fields.filter(f => f.isForeign).length
+  }), [fields]);
 
   return (
     <motion.div
@@ -136,6 +138,6 @@ const SchemaNode = ({ data, selected }) => {
       />
     </motion.div>
   );
-};
+});
 
 export default SchemaNode; 

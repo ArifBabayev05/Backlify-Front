@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Container, Row, Col, Button, Nav, Form, Modal, Alert, Spinner, Table, Badge, Card, Tooltip, OverlayTrigger } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import LoadingAnimation from '../components/common/LoadingAnimation';
-import { getXAuthUserId } from '../utils/apiService';
+import { getXAuthUserId, getUserPlan } from '../utils/apiService';
 import { apiRequest, getAccessToken, refreshAccessToken } from '../utils/apiService';
 import { useAuth } from '../components/auth/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -74,8 +74,6 @@ const EndpointsPage = () => {
   const [fieldToTableMap, setFieldToTableMap] = useState({});
   // Add error state to the component's state variables
   const [error, setError] = useState(null);
-  const [skipAuth, setSkipAuth] = useState(false);
-  const [showSkipAuthWarning, setShowSkipAuthWarning] = useState(false);
   // Make sure we capture the endpoint origin (where the user came from)
   const [originPage, setOriginPage] = useState(localStorage.getItem('endpoint_origin') || 'generate');
   const backButtonLabel = originPage === 'dashboard' ? 'Back to Dashboard' : 'Back to Schema';
@@ -317,10 +315,9 @@ const EndpointsPage = () => {
       // Create URL with limit parameter
       let url = `${apiBaseUrl}/${table}?limit=100`;
       
-      // Note: skipAuth parameter will be added by fetchWithAuth, so we don't add it here
-      // to prevent duplication
+      // No authentication required - all endpoints are public
       
-      console.log(`Fetching from URL: ${url} with skipAuth=${skipAuth}`);
+      console.log(`Fetching from URL: ${url} (public access)`);
       
       const response = await fetchWithAuth(url);
       
@@ -452,10 +449,7 @@ const EndpointsPage = () => {
       console.log('Selected API:', selectedApi);
       
       // Get auth headers for constructing the endpoint URLs
-      const token = getAccessToken();
-      const authHeadersInfo = token ? `(With Auth Header)` : '';
-      // Don't append skipAuth to URLs
-      const authStatus = skipAuth ? 'No Auth' : 'Auth Required';
+      const authStatus = 'Public Access';
       
       // Initialize endpoints based on the tables in the API
       const transformedEndpoints = selectedApi.tables.map(table => {
@@ -468,35 +462,35 @@ const EndpointsPage = () => {
               method: 'GET',
               path: `/${table}`,
               description: `List all ${table}`,
-              auth: !skipAuth,
+              auth: false,
               fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table} (${authStatus})`
             },
             {
               method: 'GET',
               path: `/${table}/:id`,
               description: `Get a single ${table} by ID`,
-              auth: !skipAuth,
+              auth: false,
               fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table}/:id (${authStatus})`
             },
             {
               method: 'POST',
               path: `/${table}`,
               description: `Create a new ${table}`,
-              auth: !skipAuth,
+              auth: false,
               fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table} (${authStatus})`
             },
             {
               method: 'PUT',
               path: `/${table}/:id`,
               description: `Update an existing ${table}`,
-              auth: !skipAuth,
+              auth: false,
               fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table}/:id (${authStatus})`
             },
             {
               method: 'DELETE',
               path: `/${table}/:id`,
               description: `Delete a ${table}`,
-              auth: !skipAuth,
+              auth: false,
               fullPath: `https://backlify-v2.onrender.com/api/${apiId}/${table}/:id (${authStatus})`
             }
           ]
@@ -757,10 +751,9 @@ const EndpointsPage = () => {
       // Create URL with pagination parameters
       let url = `${apiBaseUrl}/${table}?page=${page}&limit=${limit}`;
       
-      // Note: skipAuth parameter will be added by fetchWithAuth, so we don't add it here
-      // to prevent duplication
+      // No authentication required - all endpoints are public
       
-      console.log(`Fetching from URL: ${url} with skipAuth=${skipAuth}`);
+      console.log(`Fetching from URL: ${url} (public access)`);
       
       const response = await fetchWithAuth(url);
       
@@ -837,10 +830,9 @@ const EndpointsPage = () => {
       // Create URL with limit parameter
       let url = `${apiBaseUrl}/users?limit=100`;
       
-      // Note: skipAuth parameter will be added by fetchWithAuth, so we don't add it here
-      // to prevent duplication
+      // No authentication required - all endpoints are public
       
-      console.log(`Loading users data from: ${url} with skipAuth=${skipAuth}`);
+      console.log(`Loading users data from: ${url} (public access)`);
       
       const response = await fetchWithAuth(url);
       
@@ -895,12 +887,12 @@ const EndpointsPage = () => {
   // Utility function to handle authenticated fetches with automatic token refresh
   const fetchWithAuth = async (url, options = {}) => {
     try {
-      // Don't add skipAuth parameter to API calls
+      // Public API access - no authentication needed
       const finalUrl = url;
       
-      // Always use auth headers for actual API calls
+      // Simple headers without authentication
       const headers = {
-        ...getAuthHeaders(),
+        ...getSimpleHeaders(),
         ...options.headers
       };
       
@@ -922,9 +914,9 @@ const EndpointsPage = () => {
           // Try to refresh the token
           await refreshAccessToken();
           
-          // Get new headers with the refreshed token
+          // Get new headers without authentication
           const newHeaders = {
-            ...getAuthHeaders(),
+            ...getSimpleHeaders(),
             ...options.headers
           };
           
@@ -951,21 +943,16 @@ const EndpointsPage = () => {
     }
   };
 
-  // Utility function to get auth headers with bearer token
-  const getAuthHeaders = () => {
-    const token = getAccessToken();
+  // Simple headers - no authentication required
+  const getSimpleHeaders = () => {
     const headers = {
       'Content-Type': 'application/json'
     };
     
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    // Get the user ID from session storage
-    const userIdFromSession = sessionStorage.getItem('XAuthUserId');
-    if (userIdFromSession) {
-      headers['XAuthUserId'] = userIdFromSession;
+    // Add X-User-Plan header if available
+    const userPlan = getUserPlan();
+    if (userPlan) {
+      //headers['X-User-Plan'] = userPlan;
     }
     
     return headers;
@@ -2123,11 +2110,10 @@ const EndpointsPage = () => {
     if (!endpoint) {
       // Return a default example if endpoint is undefined
       return `curl -X GET "https://backlify-v2.onrender.com/api/your-api-id/your-endpoint" \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${getAccessToken() || 'YOUR_BEARER_TOKEN'}"`;
+  -H "Content-Type: application/json"`;
     }
     
-    const token = getAccessToken() || 'YOUR_BEARER_TOKEN';
+    // No authentication required anymore
     
     // Handle the case where fullPath might be undefined
     let url = '';
@@ -2146,12 +2132,7 @@ const EndpointsPage = () => {
     // Add headers
     curlCmd += ` \\\n  -H "Content-Type: application/json"`;
     
-    // Apply skipAuth only to examples, not actual API calls
-    if (!skipAuth) {
-      curlCmd += ` \\\n  -H "Authorization: Bearer ${token}"`;
-    } else {
-      curlCmd += ` \\\n  -H "X-Skip-Auth: true"`;
-    }
+    // No authentication required - all endpoints are public
     
     // Add body for POST and PUT requests
     if (method === 'POST' || method === 'PUT') {
@@ -2324,63 +2305,9 @@ const EndpointsPage = () => {
     return curlCmd;
   };
 
-  // Function to toggle skipAuth mode (only for examples)
-  const handleToggleSkipAuth = () => {
-    if (!skipAuth) {
-      // If enabling skipAuth, show warning first
-      setShowSkipAuthWarning(true);
-    } else {
-      // If disabling, just set the state
-      setSkipAuth(false);
-    }
-  };
+  // All APIs are public now - no authentication functions needed
 
-  // Function to confirm skipAuth after warning
-  const confirmSkipAuth = () => {
-    setSkipAuth(true);
-    setShowSkipAuthWarning(false);
-    // No need to reload endpoints since this only affects examples
-  };
-
-  // Function to cancel skipAuth
-  const cancelSkipAuth = () => {
-    setShowSkipAuthWarning(false);
-  };
-
-  // Custom styles for auth toggle
-  const authToggleStyles = `
-    .auth-toggle .form-check-input {
-      cursor: pointer;
-      height: 1.25rem;
-      width: 2.5rem;
-      transition: all 0.2s ease;
-    }
-    
-    .auth-toggle .form-check-input:checked {
-      background-color: #10b981;
-      border-color: #10b981;
-    }
-    
-    .auth-toggle .form-check-input:not(:checked) {
-      background-color: #dc3545;
-      border-color: #dc3545;
-    }
-    
-    .auth-toggle .form-check-input:focus {
-      box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
-    }
-    
-    .auth-toggle .form-check-input:not(:checked):focus {
-      box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
-    }
-    
-    .auth-toggle .form-check-label {
-      cursor: pointer;
-      user-select: none;
-      font-weight: 600;
-      padding-left: 0.5rem;
-    }
-  `;
+  // No custom styles needed for authentication anymore
 
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ 
@@ -2388,7 +2315,7 @@ const EndpointsPage = () => {
       height: '100vh', // Set explicit height for main container
       overflow: 'hidden' // Prevent overall page scrolling
     }}>
-      <style>{authToggleStyles}</style>
+      {/* No custom styles needed */}
       {/* Header */}
       <header className="p-3 d-flex align-items-center justify-content-between" style={{ 
         background: 'rgba(15, 23, 42, 0.8)',
@@ -2415,27 +2342,18 @@ const EndpointsPage = () => {
         </motion.div>
         
         <div className="d-flex align-items-center gap-3">
-          {/* Authentication Toggle Section */}
+          {/* Authentication Info Section */}
           <div className="d-flex flex-column gap-1">
             <div className="d-flex align-items-center gap-2 bg-dark bg-opacity-75 px-3 py-2 rounded-pill">
               <span className="text-white-50 small">Authentication:</span>
-              <Form.Check
-                type="switch"
-                id="skip-auth-switch"
-                className="auth-toggle"
-                checked={!skipAuth}
-                onChange={handleToggleSkipAuth}
-                label={<span className={skipAuth ? "text-danger" : "text-success"}>{skipAuth ? "Disabled" : "Enabled"}</span>}
-              />
+              <span className="text-success fw-bold">Public Access</span>
             </div>
-            {skipAuth && (
-              <div className="small text-danger px-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="me-1">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                API requests will skip authentication
-              </div>
-            )}
+            <div className="small text-success px-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="me-1">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              All endpoints are publicly accessible
+            </div>
           </div>
           <motion.div 
             whileHover={{ scale: 1.03 }} 
@@ -3479,11 +3397,9 @@ const EndpointsPage = () => {
                   {selectedEndpoint.path || '/api/endpoint'}
                 </h6>
                 <p className="text-light mb-1">{selectedEndpoint.description || 'API endpoint'}</p>
-                <p className="text-muted small mb-0">
+                <p className="text-white small mb-0">
                   <i className="bi bi-info-circle me-1"></i>
-                  {skipAuth ? 
-                    'Example shown without authentication for demonstration purposes.' :
-                    'All requests to the API require authentication headers.'}
+                  
                 </p>
               </div>
               
@@ -3508,17 +3424,11 @@ const EndpointsPage = () => {
                 </h6>
                 <div className="bg-black p-3 rounded mb-2">
                   <pre className="text-info mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-{skipAuth ? 
-`Content-Type: application/json
-X-Skip-Auth: true` : 
-`Content-Type: application/json
-Authorization: Bearer ${getAccessToken() || 'YOUR_ACCESS_TOKEN'}`}
+Content-Type: application/json
                   </pre>
                 </div>
-                <p className="text-muted small mb-0">
-                  {skipAuth ? 
-                    <><i className="bi bi-unlock me-1"></i> Authentication is disabled. Using X-Skip-Auth header instead.</> : 
-                    <><i className="bi bi-lock me-1"></i> Authentication is required for this endpoint.</>}
+                <p className="text-white small mb-0">
+                  
                 </p>
               </div>
               
@@ -3555,57 +3465,7 @@ Authorization: Bearer ${getAccessToken() || 'YOUR_ACCESS_TOKEN'}`}
         </Modal.Footer>
       </Modal>
       
-      {/* Skip Auth Warning Modal */}
-      <Modal
-        show={showSkipAuthWarning}
-        onHide={cancelSkipAuth}
-        backdrop="static"
-        centered
-        className="dark-modal"
-      >
-        <Modal.Header closeButton className="bg-dark text-white border-secondary">
-          <Modal.Title>
-            <FaExclamationTriangle className="text-warning me-2" /> Security Warning
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="bg-dark text-white">
-          <div className="p-2 bg-warning bg-opacity-10 border border-warning rounded mb-3">
-            <div className="d-flex">
-              <div className="me-3">
-                <FaExclamationTriangle className="text-warning" size={24} />
-              </div>
-              <div>
-                <h5 className="text-warning">Disabling Authentication</h5>
-                <p className="mb-0">You are about to disable authentication for your API requests. This means:</p>
-                <ul className="mt-2 mb-0">
-                  <li>No authentication token will be required</li>
-                  <li>Your requests will use the "anonymous" user identity</li>
-                  <li>Anyone with access to your API endpoints can use them</li>
-                  <li>You may expose sensitive data or operations</li>
-                  <li>The <code>?skipAuth=true</code> parameter or <code>X-Skip-Auth: true</code> header will be added to requests</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
-          <p>This setting is useful for:</p>
-          <ul>
-            <li>Public API endpoints that don't require user context</li>
-            <li>Testing endpoints without authentication</li>
-            <li>Sharing API endpoints with external systems</li>
-          </ul>
-          
-          
-        </Modal.Body>
-        <Modal.Footer className="bg-dark border-secondary">
-          <Button variant="outline-light" onClick={cancelSkipAuth}>
-            Keep Authentication
-          </Button>
-          <Button variant="warning" onClick={confirmSkipAuth}>
-            Disable Authentication
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Authentication info - All APIs are now public */}
     </div>
   );
 };

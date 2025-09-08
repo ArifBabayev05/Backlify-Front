@@ -257,9 +257,12 @@ const LandingPage = () => {
                 >
                   <img 
                     src={dbIcon} 
-                    alt="Database Icon" 
+                    alt="Database Schema Builder Icon - Build APIs visually" 
                     className="mb-3" 
                     style={{ height: '60px', width: 'auto' }} 
+                    loading="lazy"
+                    width="60"
+                    height="60"
                   />
                 </motion.div>
               </div>

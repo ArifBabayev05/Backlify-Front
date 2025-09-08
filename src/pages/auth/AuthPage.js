@@ -1,10 +1,24 @@
-import React, { useState, useEffect, useRef,createContext,useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
 import { Container, Form, Button, Alert, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-hot-toast';
-import * as THREE from 'three';
+// Import only required THREE.js modules for better bundle size
+import { 
+  Scene, 
+  PerspectiveCamera, 
+  WebGLRenderer, 
+  IcosahedronGeometry, 
+  MeshStandardMaterial, 
+  Mesh, 
+  TorusGeometry, 
+  AmbientLight, 
+  DirectionalLight,
+  Clock 
+} from 'three';
 import { useAuth } from '../../components/auth/AuthContext';
 // Router funksionallığı üçün lazımi importlar
 import { MemoryRouter, Link, useLocation, useNavigate, Routes, Route } from 'react-router-dom';
+// Google OAuth import
+import { useGoogleLogin } from '@react-oauth/google';
 
 //=================================================================
 // 1. AuthContext (İstifadəçi məlumatlarını saxlamaq üçün)
@@ -19,7 +33,9 @@ const AuthProvider = ({ children }) => {
     const login = (userData) => {
         setUser(userData);
         // Real proyektlərdə token-ləri localStorage və ya sessionStorage-da saxlamaq olar
-        console.log("User data saved in context:", userData);
+        if (process.env.NODE_ENV === 'development') {
+            console.log("User data saved in context:", userData);
+        }
     };
 
     const logout = () => {
@@ -33,9 +49,9 @@ const AuthProvider = ({ children }) => {
 
 
 //=================================================================
-// 2. 3D Animasya Komponenti 
+// 2. 3D Animasya Komponenti - Memoized for performance
 //=================================================================
-const ThreeAnimation = () => {
+const ThreeAnimation = React.memo(() => {
     const mountRef = useRef(null);
     const mouse = useRef({ x: 0, y: 0 });
 
@@ -43,29 +59,29 @@ const ThreeAnimation = () => {
         if (!mountRef.current) return;
         const currentMount = mountRef.current;
 
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
+        const scene = new Scene();
+        const camera = new PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
         camera.position.z = 5;
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         currentMount.appendChild(renderer.domElement);
 
         const primaryColor = 0x6366f1;
         const secondaryColor = 0x8b5cf6;
-        const geometry = new THREE.IcosahedronGeometry(1.5, 1);
-        const material = new THREE.MeshStandardMaterial({ color: primaryColor, roughness: 0.2, metalness: 0.7, wireframe: true });
-        const crystal = new THREE.Mesh(geometry, material);
+        const geometry = new IcosahedronGeometry(1.5, 1);
+        const material = new MeshStandardMaterial({ color: primaryColor, roughness: 0.2, metalness: 0.7, wireframe: true });
+        const crystal = new Mesh(geometry, material);
         scene.add(crystal);
 
-        const torusGeometry = new THREE.TorusGeometry(2.5, 0.05, 16, 100);
-        const torusMaterial = new THREE.MeshStandardMaterial({ color: secondaryColor, roughness: 0.1, metalness: 0.9 });
-        const torus = new THREE.Mesh(torusGeometry, torusMaterial);
+        const torusGeometry = new TorusGeometry(2.5, 0.05, 16, 100);
+        const torusMaterial = new MeshStandardMaterial({ color: secondaryColor, roughness: 0.1, metalness: 0.9 });
+        const torus = new Mesh(torusGeometry, torusMaterial);
         torus.rotation.x = Math.PI / 2;
         scene.add(torus);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        const ambientLight = new AmbientLight(0xffffff, 0.3);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        const directionalLight = new DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
 
@@ -88,7 +104,7 @@ const ThreeAnimation = () => {
         handleResize();
         window.addEventListener('resize', handleResize);
 
-        const clock = new THREE.Clock();
+        const clock = new Clock();
         const animate = () => {
             requestAnimationFrame(animate);
             const targetRotationX = mouse.current.y * 0.5;
@@ -113,8 +129,8 @@ const ThreeAnimation = () => {
         };
     }, []);
 
-    return <div ref={mountRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, cursor: 'grab' }} />;
-};
+    return <div ref={mountRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, cursor: 'pointer' }} />;
+});
 
 //=================================================================
 // 3. Əsas AuthPage komponenti (Bütün məntiq burada cəmlənib)
@@ -135,32 +151,36 @@ const AuthPage = () => {
     const [loginFormData, setLoginFormData] = useState({ username: '', password: '' });
     const [loginLoading, setLoginLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
+    const [privacyAccepted, setPrivacyAccepted] = useState(false);
+    const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
 
-    const handleRegisterChange = (e) => {
+    const handleRegisterChange = useCallback((e) => {
         const { name, value } = e.target;
         setRegisterFormData(prev => ({ ...prev, [name]: value }));
-    };
+    }, []);
     
-    const handleLoginChange = (e) => {
+    const handleLoginChange = useCallback((e) => {
         const { name, value } = e.target;
         setLoginFormData(prev => ({ ...prev, [name]: value }));
-    };
+    }, []);
 
-    const validateRegisterForm = () => {
+    const validateRegisterForm = useCallback(() => {
         const { username, password, confirmPassword } = registerFormData;
         const usernameRegex = /^[a-zA-Z0-9]+$/;
         if (!usernameRegex.test(username)) { setRegisterError('Username can only contain letters and numbers.'); return false; }
         if (username.length > 20) { setRegisterError('Username cannot be longer than 20 characters.'); return false; }
         if (password !== confirmPassword) { setRegisterError('Passwords do not match.'); return false; }
         if (password.length < 8) { setRegisterError('Password must be at least 8 characters long.'); return false; }
+        if (!privacyAccepted) { setRegisterError('You must accept the privacy policy to continue.'); return false; }
         setRegisterError('');
         return true;
-    };
+    }, [registerFormData, privacyAccepted]);
 
     const handleRegisterSubmit = async (e) => {
         e.preventDefault();
         if (!validateRegisterForm()) return toast.error(registerError);
+        
         setRegisterLoading(true);
         setRegisterError('');
         try {
@@ -184,6 +204,8 @@ const AuthPage = () => {
 
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
+        
+        
         setLoginLoading(true);
         setLoginError('');
         try {
@@ -216,7 +238,86 @@ const AuthPage = () => {
         }
     };
 
-    const pageStyles = `
+    // Google OAuth login handler
+    const handleGoogleLogin = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            try {
+                setLoginLoading(true);
+                setLoginError('');
+                
+                // Get user info from Google API
+                const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                    headers: {
+                        Authorization: `Bearer ${tokenResponse.access_token}`,
+                    },
+                });
+                
+                if (!userInfoResponse.ok) {
+                    throw new Error('Failed to get user information from Google');
+                }
+                
+                const googleUserInfo = await userInfoResponse.json();
+                
+                // Send Google token to your backend for verification and login
+                const response = await fetch('https://backlify-v2.onrender.com/auth/google-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        google_token: tokenResponse.access_token,
+                        email: googleUserInfo.email,
+                        name: googleUserInfo.name,
+                        picture: googleUserInfo.picture,
+                        google_id: googleUserInfo.id
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    // If backend doesn't have Google login endpoint, fall back to auto-registration
+                    if (response.status === 404) {
+                        // Auto-create user account with Google info
+                        const username = googleUserInfo.email.split('@')[0] + '_google';
+                        login({
+                            XAuthUserId: username,
+                            email: googleUserInfo.email,
+                            accessToken: tokenResponse.access_token,
+                            refreshToken: tokenResponse.refresh_token || ''
+                        });
+                        toast.success('Google login successful!');
+                        navigate(from, { replace: true });
+                        return;
+                    }
+                    throw new Error(data.details || data.error || 'Google authentication failed');
+                }
+                
+                login({
+                    XAuthUserId: data.XAuthUserId || googleUserInfo.email.split('@')[0],
+                    email: data.email || googleUserInfo.email,
+                    accessToken: data.accessToken,
+                    refreshToken: data.refreshToken
+                });
+
+                toast.success('Google login successful!');
+                navigate(from, { replace: true });
+                
+            } catch (error) {
+                setLoginError(error.message);
+                toast.error(error.message || 'Google login failed. Please try again.');
+            } finally {
+                setLoginLoading(false);
+            }
+        },
+        onError: (error) => {
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Google Login Failed:', error);
+            }
+            setLoginError('Google login failed');
+            toast.error('Google login failed. Please try again.');
+        },
+    });
+
+    const pageStyles = useMemo(() => `
         :root {
             --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             --dark-bg: #030712;
@@ -279,7 +380,55 @@ const AuthPage = () => {
             transform: translateY(-2px);
             box-shadow: 0 12px 20px rgba(99, 102, 241, 0.4);
         }
-    `;
+        
+        .btn-google {
+            background: #ffffff;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+            padding: 0.9rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .btn-google:hover {
+            background: #f8f9fa;
+            color: #3c4043;
+            border-color: #dadce0;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .btn-google:focus {
+            background: #f8f9fa;
+            color: #3c4043;
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+        }
+        
+        .divider {
+            position: relative;
+            text-align: center;
+            margin: 1.5rem 0;
+        }
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .divider span {
+            background: var(--card-bg);
+            padding: 0 1rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+    `, []);
 
     return (
         <>
@@ -326,9 +475,33 @@ const AuthPage = () => {
                                             <Form.Control type="password" name="password" placeholder="Enter your password" value={loginFormData.password} onChange={handleLoginChange} required className="form-control-custom" />
                                         </Col>
                                     </Form.Group>
-                                    <div className="d-grid">
+                                    
+                                    
+                                    
+                                    <div className="d-grid mb-3">
                                         <Button type="submit" disabled={loginLoading} className="btn-gradient">
                                             {loginLoading ? 'Signing In...' : 'Sign In'}
+                                        </Button>
+                                    </div>
+                                    
+                                    <div className="divider">
+                                        <span>OR</span>
+                                    </div>
+                                    
+                                    <div className="d-grid">
+                                        <Button 
+                                            type="button" 
+                                            disabled={loginLoading} 
+                                            className="btn-google"
+                                            onClick={() => handleGoogleLogin()}
+                                        >
+                                            <svg width="18" height="18" viewBox="0 0 48 48">
+                                                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                                                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                                                <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                                                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                                            </svg>
+                                            {loginLoading ? 'Signing in with Google...' : 'Continue with Google'}
                                         </Button>
                                     </div>
                                 </Form>
@@ -364,6 +537,50 @@ const AuthPage = () => {
                                             <Form.Control type="password" name="confirmPassword" placeholder="Re-enter password" value={registerFormData.confirmPassword} onChange={handleRegisterChange} required className="form-control-custom"/>
                                         </Col>
                                     </Form.Group>
+                                    
+                                    {/* Privacy Policy Checkbox */}
+                                    <Form.Group className="mb-3">
+                                        <Form.Check
+                                            type="checkbox"
+                                            id="privacy-policy-register"
+                                            checked={privacyAccepted}
+                                            onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                                            label={
+                                                <span className="text-light" style={{ fontSize: '0.9rem' }}>
+                                                    I have read and accept the{' '}
+                                                    <Link 
+                                                        to="/privacy" 
+                                                        className="text-decoration-none" 
+                                                        style={{ color: '#6366f1' }}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        Privacy Policy
+                                                    </Link>
+                                                    <span className="text-danger ms-1">*</span>
+                                                </span>
+                                            }
+                                            className="d-flex align-items-start"
+                                            required
+                                        />
+                                    </Form.Group>
+
+                                    {/* Newsletter Checkbox */}
+                                    <Form.Group className="mb-4">
+                                        <Form.Check
+                                            type="checkbox"
+                                            id="newsletter-register"
+                                            checked={newsletterSubscribed}
+                                            onChange={(e) => setNewsletterSubscribed(e.target.checked)}
+                                            label={
+                                                <span className="text-light" style={{ fontSize: '0.9rem' }}>
+                                                    I agree to receive updates and information via email
+                                                </span>
+                                            }
+                                            className="d-flex align-items-start"
+                                        />
+                                    </Form.Group>
+                                    
                                     <div className="d-grid">
                                         <Button type="submit" disabled={registerLoading} className="btn-gradient">
                                             {registerLoading ? 'Creating Account...' : 'Create Account'}

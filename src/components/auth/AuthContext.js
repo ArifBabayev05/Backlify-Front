@@ -5,7 +5,11 @@ import {
   setTokens,
   getAccessToken,
   getRefreshToken,
-  setXAuthUserId
+  setXAuthUserId,
+  setUserPlan,
+  startTokenRefresh,
+  stopTokenRefresh,
+  loadTokensFromStorage
 } from '../../utils/apiService';
 
 const AuthContext = createContext(null);
@@ -27,18 +31,15 @@ export const AuthProvider = ({ children }) => {
             try {
                 const username = localStorage.getItem('username');
                 const email = localStorage.getItem('email');
-                const savedAccessToken = localStorage.getItem('accessToken');
-                const savedRefreshToken = localStorage.getItem('refreshToken');
                 
-                if (savedAccessToken && savedRefreshToken) {
-                    setTokens(savedAccessToken, savedRefreshToken);
-                }
+                // Load tokens from storage into memory
+                const tokensLoaded = loadTokensFromStorage();
                 
                 if (username) {
                     setXAuthUserId(username);
                 }
                 
-                if (username && email && savedAccessToken) {
+                if (username && email && tokensLoaded) {
                     setUser({ username, email });
                 }
             } catch (error) {
@@ -61,6 +62,11 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('email', userData.email);
         setXAuthUserId(userData.XAuthUserId);
         
+        // Set user plan if available
+        if (userData.plan) {
+            setUserPlan(userData.plan);
+        }
+        
         if (userData.accessToken && userData.refreshToken) {
             localStorage.setItem('accessToken', userData.accessToken);
             localStorage.setItem('refreshToken', userData.refreshToken);
@@ -70,6 +76,8 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
+            // Stop token refresh before logout
+            stopTokenRefresh();
             await apiLogoutUser();
         } catch (error) {
             console.error('Logout API call failed:', error);
@@ -81,6 +89,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('refreshToken');
             setTokens(null, null);
             setXAuthUserId(null);
+            setUserPlan(null);
         }
     };
 

@@ -122,7 +122,8 @@ const PromptInput = ({ onGenerate }) => {
                   background: 'rgba(15, 23, 42, 0.3)',
                   borderRadius: '10px',
                   resize: 'none',
-                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)'
+                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
+                  cursor: 'text'
                 }}
                 disabled={isSubmitting}
               />

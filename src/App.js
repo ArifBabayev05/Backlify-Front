@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Toaster } from 'react-hot-toast';
 import { Modal, Button } from 'react-bootstrap';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Import pages
 import LandingPage from './pages/LandingPage';
@@ -10,9 +11,15 @@ import IntroPage from './pages/IntroPage';
 import SchemaPage from './pages/SchemaPage';
 import EndpointsPage from './pages/EndpointsPage';
 import DashboardPage from './pages/DashboardPage';
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
 import LogsDashboardPage from './pages/LogsDashboardPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import PaymentErrorPage from './pages/PaymentErrorPage';
+import PaymentCallbackPage from './pages/PaymentCallbackPage';
+import PrivacyPage from './pages/PrivacyPage';
+import AccountSettingsPage from './pages/AccountSettingsPage';
+import PaymentDemoPage from './pages/PaymentDemoPage';
+import UsageLimitsPage from './pages/UsageLimitsPage';
+import AdminUsagePage from './pages/AdminUsagePage';
 
 // Import components
 import NavBar from './components/layout/NavBar';
@@ -44,35 +51,37 @@ function App() {
   };
 
   return (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-        <Modal show={showMobileWarning} onHide={handleDismissMobileWarning} centered>
-          <Modal.Header closeButton>
-            <Modal.Title style={{ color: 'black' }}>Best Experience on Desktop</Modal.Title>
-          </Modal.Header>
-          <Modal.Body style={{ color: 'black' }}>
-            Backlify may not be fully optimized for mobile devices yet. For the best experience, please use a desktop or laptop computer. A dedicated mobile app is coming soon. You can continue on your phone if you prefer, but some features may be limited or feel less responsive.
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="primary" onClick={handleDismissMobileWarning}>
-              Continue anyway
-            </Button>
-          </Modal.Footer>
-        </Modal>
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#363636',
-              color: '#fff',
-              border: '1px solid rgba(59, 130, 246, 0.2)',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)'
-            },
-          }}
-        />
-      </Router>
-    </AuthProvider>
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+          <Modal show={showMobileWarning} onHide={handleDismissMobileWarning} centered>
+            <Modal.Header closeButton>
+              <Modal.Title style={{ color: 'black' }}>Best Experience on Desktop</Modal.Title>
+            </Modal.Header>
+            <Modal.Body style={{ color: 'black' }}>
+              Backlify may not be fully optimized for mobile devices yet. For the best experience, please use a desktop or laptop computer. A dedicated mobile app is coming soon. You can continue on your phone if you prefer, but some features may be limited or feel less responsive.
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="primary" onClick={handleDismissMobileWarning}>
+                Continue anyway
+              </Button>
+            </Modal.Footer>
+          </Modal>
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#363636',
+                color: '#fff',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)'
+              },
+            }}
+          />
+        </Router>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }
 
@@ -113,6 +122,63 @@ function AppRoutes() {
             <LogsDashboardPage />
           </RequireAuth>
         } />
+        {/* Payment Routes */}
+        <Route path="/payment/plans" element={
+          <RequireAuth>
+            <PaymentDemoPage />
+          </RequireAuth>
+        } />
+        <Route path="/payment/upgrade" element={
+          <RequireAuth>
+            <PaymentDemoPage />
+          </RequireAuth>
+        } />
+        <Route path="/payment/success" element={
+          <RequireAuth>
+            <PaymentSuccessPage />
+          </RequireAuth>
+        } />
+        <Route path="/payment/error" element={
+          <RequireAuth>
+            <PaymentErrorPage />
+          </RequireAuth>
+        } />
+        <Route path="/payment/callback" element={
+          <RequireAuth>
+            <PaymentCallbackPage />
+          </RequireAuth>
+        } />
+        
+        {/* Account Management Routes */}
+        <Route path="/account" element={
+          <RequireAuth>
+            <AccountSettingsPage />
+          </RequireAuth>
+        } />
+        <Route path="/account/subscription" element={
+          <RequireAuth>
+            <AccountSettingsPage />
+          </RequireAuth>
+        } />
+        <Route path="/account/billing" element={
+          <RequireAuth>
+            <AccountSettingsPage />
+          </RequireAuth>
+        } />
+        
+        {/* Usage Limits Routes */}
+        <Route path="/usage" element={
+          <RequireAuth>
+            <UsageLimitsPage />
+          </RequireAuth>
+        } />
+        <Route path="/admin/usage" element={
+          <RequireAuth>
+            <AdminUsagePage />
+          </RequireAuth>
+        } />
+        
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="*" element={<Navigate to={isAuthenticated() ? "/landing" : "/"} replace />} />
       </Routes>
     </>

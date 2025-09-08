@@ -63,6 +63,9 @@ const NavBar = () => {
                 <Nav.Link as={Link} to="/dashboard" onClick={() => setExpanded(false)}>
                   Dashboard
                 </Nav.Link>
+                <Nav.Link as={Link} to="/usage" onClick={() => setExpanded(false)}>
+                  Usage & Plans
+                </Nav.Link>
                
                 
                 <Dropdown align="end">
@@ -88,10 +91,10 @@ const NavBar = () => {
                       }}
                       onClick={() => {
                         setExpanded(false);
-                        navigate('/profile');
+                        navigate('/account');
                       }}
                     >
-                      Profile
+                      Account Settings
                     </Dropdown.Item>
                     <Dropdown.Divider style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
                     <Dropdown.Item 

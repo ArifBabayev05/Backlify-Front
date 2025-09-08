@@ -1,0 +1,500 @@
+/* Payment-specific styles for Epoint integration */
+
+/* Payment Form Styles */
+.payment-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.payment-method-radio {
+  padding: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.payment-method-radio:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.05);
+  transform: translateY(-2px);
+}
+
+.payment-method-radio .form-check-input:checked + .form-check-label {
+  color: #3b82f6;
+}
+
+.payment-method-radio .form-check-input:checked {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+/* Saved Card Styles */
+.saved-card-item {
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.saved-card-item:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.05);
+  transform: translateY(-2px);
+}
+
+.saved-card-item.selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+.card-brand-icon {
+  font-size: 1.5rem;
+  margin-right: 0.75rem;
+}
+
+/* Payment Status Styles */
+.payment-status-container {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.status-icon {
+  filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.5));
+}
+
+.status-icon.success {
+  filter: drop-shadow(0 0 20px rgba(40, 167, 69, 0.5));
+}
+
+.status-icon.error {
+  filter: drop-shadow(0 0 20px rgba(220, 53, 69, 0.5));
+}
+
+.status-icon.warning {
+  filter: drop-shadow(0 0 20px rgba(255, 193, 7, 0.5));
+}
+
+/* Subscription Plans Styles */
+.subscription-plans {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.plan-card {
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.plan-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.plan-card.popular {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
+  transform: scale(1.05);
+}
+
+.plan-card.popular:hover {
+  transform: scale(1.05) translateY(-8px);
+}
+
+.plan-card.popular::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.plan-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.plan-icon.warning {
+  background: rgba(255, 193, 7, 0.1);
+  color: #ffc107;
+}
+
+.plan-icon.secondary {
+  background: rgba(108, 117, 125, 0.1);
+  color: #6c757d;
+}
+
+.plan-price {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.5rem;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.plan-features li {
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  color: #e2e8f0;
+}
+
+.plan-features li .check-icon {
+  color: #28a745;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.plan-limitations {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.plan-limitations li {
+  padding: 0.25rem 0;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+/* Refund Manager Styles */
+.refund-manager {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.refund-amount-input {
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  padding: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.refund-amount-input:focus {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.refund-amount-input::placeholder {
+  color: #94a3b8;
+}
+
+/* Account Settings Styles */
+.account-settings {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.settings-tab {
+  border: none;
+  background: transparent;
+}
+
+.settings-tab .nav-link {
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  border-radius: 8px;
+  margin-right: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.settings-tab .nav-link:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.settings-tab .nav-link.active {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.settings-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.settings-form .form-control {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ffffff;
+  padding: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.settings-form .form-control:focus {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  color: #ffffff;
+}
+
+.settings-form .form-control::placeholder {
+  color: #94a3b8;
+}
+
+.settings-form .form-label {
+  color: #e2e8f0;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+/* Payment History Styles */
+.payment-history-item {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+}
+
+.payment-history-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.payment-amount {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.payment-date {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.payment-description {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+/* Security Settings Styles */
+.security-setting {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+}
+
+.security-setting:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.security-setting-title {
+  color: #ffffff;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.security-setting-description {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  margin-bottom: 0;
+}
+
+/* Notification Settings Styles */
+.notification-setting {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+}
+
+.notification-setting:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Glass Effect Enhancements */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Button Enhancements */
+.btn-payment {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-payment:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(145deg, #2563eb, #1d4ed8);
+}
+
+.btn-payment:active {
+  transform: translateY(0);
+}
+
+.btn-outline-payment {
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.05);
+  color: #3b82f6;
+  border-radius: 12px;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-payment:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+/* Loading States */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  z-index: 10;
+}
+
+.loading-spinner {
+  color: #3b82f6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .payment-form,
+  .payment-status-container,
+  .refund-manager,
+  .account-settings {
+    padding: 0 1rem;
+  }
+  
+  .plan-card {
+    margin-bottom: 2rem;
+  }
+  
+  .plan-card.popular {
+    transform: none;
+  }
+  
+  .plan-card.popular:hover {
+    transform: translateY(-4px);
+  }
+  
+  .settings-section {
+    padding: 1.5rem;
+  }
+  
+  .payment-history-item {
+    padding: 1rem;
+  }
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.6s ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Error States */
+.error-state {
+  border-color: #dc3545 !important;
+  background: rgba(220, 53, 69, 0.05) !important;
+}
+
+.error-state:focus {
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
+}
+
+/* Success States */
+.success-state {
+  border-color: #28a745 !important;
+  background: rgba(40, 167, 69, 0.05) !important;
+}
+
+.success-state:focus {
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1) !important;
+}
+
+/* Warning States */
+.warning-state {
+  border-color: #ffc107 !important;
+  background: rgba(255, 193, 7, 0.05) !important;
+}
+
+.warning-state:focus {
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.1) !important;
+}

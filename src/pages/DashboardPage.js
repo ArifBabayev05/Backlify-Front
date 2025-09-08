@@ -46,7 +46,7 @@ const DashboardPage = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   // Check if user is admin
-  const isAdmin = user?.username == 'Admin' || user?.username == 'aa';
+  const isAdmin = user?.username == 'Admin' ;
 
   useEffect(() => {
     // When component mounts, check if we need a fresh reload
@@ -329,6 +329,18 @@ const DashboardPage = () => {
                   <FaChartLine size={14} /> <span className="d-none d-md-inline">Logs Dashboard</span>
                 </Button>
               )}
+              <Button
+                variant="outline-info"
+                className="d-flex align-items-center gap-2"
+                onClick={() => navigate('/usage')}
+                style={{
+                  borderColor: 'rgba(59, 130, 246, 0.4)',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem'
+                }}
+              >
+                <FaChartLine size={14} /> <span className="d-none d-md-inline">Usage & Plans</span>
+              </Button>
               <Button
                 variant="outline-light"
                 className="d-flex align-items-center gap-2"

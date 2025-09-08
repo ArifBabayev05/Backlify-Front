@@ -1,82 +1,137 @@
-// Error handler utility for API responses
 import { toast } from 'react-hot-toast';
+import { isUsageLimitError, extractUsageLimitInfo } from './apiService';
 
-/**
- * Maps HTTP status codes to user-friendly messages
- * @param {number} statusCode - HTTP status code
- * @returns {string} - User-friendly error message
- */
-export const getErrorMessageForStatus = (statusCode) => {
-  switch (statusCode) {
-    case 400:
-      return 'Bad request: Missing or invalid input.';
-    case 401:
-      return 'Your session has expired. Please log in again.';
-    case 403:
-      return 'You do not have permission to access this resource.';
-    case 404:
-      return 'The requested resource was not found.';
-    case 429:
-      return 'Too many requests. Please try again later.';
-    case 500:
-    case 501:
-    case 502:
-    case 503:
-    case 504:
-      return 'The server encountered an error. Please try again later.';
-    default:
-      return 'An unexpected error occurred.';
+// Global error handler for API requests
+export const handleApiError = (error, context = '') => {
+  console.error(`API Error${context ? ` in ${context}` : ''}:`, error);
+
+  // Check if it's a usage limit error
+  if (isUsageLimitError(error)) {
+    const limitInfo = extractUsageLimitInfo(error);
+    
+    if (limitInfo) {
+      // Dispatch custom event for limit notifications
+      const event = new CustomEvent('apiError', { 
+        detail: { error, limitInfo, context } 
+      });
+      window.dispatchEvent(event);
+      
+      // Don't show additional toast for limit errors as notifications handle it
+      return;
+    }
+  }
+
+  // Handle other types of errors
+  let errorMessage = 'An unexpected error occurred';
+  
+  if (error.message) {
+    errorMessage = error.message;
+  } else if (error.status) {
+    switch (error.status) {
+      case 400:
+        errorMessage = 'Invalid request. Please check your input.';
+        break;
+      case 401:
+        errorMessage = 'Authentication required. Please log in again.';
+        break;
+      case 403:
+        errorMessage = 'Access denied. You don\'t have permission for this action.';
+        break;
+      case 404:
+        errorMessage = 'Resource not found.';
+        break;
+      case 429:
+        errorMessage = 'Too many requests. Please try again later.';
+        break;
+      case 500:
+        errorMessage = 'Server error. Please try again later.';
+        break;
+      default:
+        errorMessage = `Request failed with status ${error.status}`;
+    }
+  }
+
+  // Show error toast
+  toast.error(errorMessage, {
+    duration: 5000,
+    position: 'top-right'
+  });
+};
+
+// Enhanced API request wrapper with error handling
+export const apiRequestWithErrorHandling = async (apiRequest, endpoint, options = {}) => {
+  try {
+    return await apiRequest(endpoint, options);
+  } catch (error) {
+    handleApiError(error, endpoint);
+    throw error; // Re-throw for component-level handling if needed
   }
 };
 
-/**
- * Formats API error response into a user-friendly message
- * @param {Error} error - Error object from API request
- * @returns {string} - Formatted error message
- */
-export const formatApiError = (error) => {
-  if (!error) return 'An unknown error occurred';
-
-  // Extract details from the error object
-  const status = error.status || 500;
-  const message = error.message || getErrorMessageForStatus(status);
-  const details = error.details || '';
-  const requestId = error.requestId || '';
-
-  // Build error message
-  let formattedMessage = message;
-  
-  // If there are additional details, add them
-  if (details && details !== message) {
-    formattedMessage += `: ${details}`;
+// Usage limit specific error handler
+export const handleUsageLimitError = (error, onUpgradeClick) => {
+  if (!isUsageLimitError(error)) {
+    return false;
   }
-  
-  // For development, add request ID for debugging
-  if (requestId && process.env.NODE_ENV === 'development') {
-    formattedMessage += ` (Request ID: ${requestId})`;
+
+  const limitInfo = extractUsageLimitInfo(error);
+  if (!limitInfo) {
+    return false;
   }
-  
-  return formattedMessage;
+
+  // Show appropriate notification based on usage level
+  if (limitInfo.percentage >= 100) {
+    toast.error(
+      `Usage limit exceeded! ${limitInfo.message}`,
+      {
+        duration: 8000,
+        icon: '🚫',
+        action: onUpgradeClick ? {
+          label: 'Upgrade Plan',
+          onClick: onUpgradeClick
+        } : undefined
+      }
+    );
+  } else if (limitInfo.percentage >= 90) {
+    toast.warning(
+      `Approaching usage limit: ${limitInfo.percentage}% used`,
+      {
+        duration: 6000,
+        icon: '⚠️',
+        action: onUpgradeClick ? {
+          label: 'Upgrade Plan',
+          onClick: onUpgradeClick
+        } : undefined
+      }
+    );
+  }
+
+  return true;
 };
 
-/**
- * Handles API errors by displaying a toast notification
- * @param {Error} error - Error object from API request
- * @param {boolean} showToast - Whether to show a toast notification (default: true)
- * @returns {string} - Formatted error message
- */
-export const handleApiError = (error, showToast = true) => {
-  const message = formatApiError(error);
-  
-  if (showToast) {
-    toast.error(message);
+// Network error handler
+export const handleNetworkError = (error) => {
+  if (error.name === 'TypeError' && error.message.includes('fetch')) {
+    toast.error('Network error. Please check your internet connection.', {
+      duration: 5000
+    });
+    return true;
   }
+  return false;
+};
+
+// Global error boundary handler
+export const handleGlobalError = (error, errorInfo) => {
+  console.error('Global error:', error, errorInfo);
   
-  return message;
+  // Don't show toast for React error boundaries as they're usually handled by components
+  // Just log for debugging
 };
 
 export default {
-  getErrorMessageForStatus,
-  formatApiError,
-  handleApiError
-}; 
+  handleApiError,
+  apiRequestWithErrorHandling,
+  handleUsageLimitError,
+  handleNetworkError,
+  handleGlobalError
+};

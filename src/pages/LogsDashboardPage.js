@@ -70,7 +70,7 @@ const LogsDashboardPage = () => {
   const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [showUsernameSuggestions, setShowUsernameSuggestions] = useState(false);
 
-  const isAdmin = user?.username == 'Admin' || user?.username == 'aa';
+  const isAdmin = user?.username == 'Admin' ;
   useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard');
@@ -148,6 +148,7 @@ const LogsDashboardPage = () => {
         queryParams.append('timeRange', timeRange);
       }
       
+      
       // Append the query string to the URL
       const response = await fetch(`https://backlify-v2.onrender.com/admin/logs?${queryParams.toString()}`, {
         method: 'GET',
@@ -183,6 +184,12 @@ const LogsDashboardPage = () => {
         queryParams.append('endDate', customEndDate);
       } else {
         queryParams.append('timeRange', timeRange);
+      }
+      
+      // Add XAuthUserId if available
+      const username = localStorage.getItem('username');
+      if (username) {
+        queryParams.append('XAuthUserId', username);
       }
       
       // Append the query string to the URL
@@ -446,7 +453,13 @@ const LogsDashboardPage = () => {
     
     try {
       // Try to get unique usernames from existing logs first as a more reliable approach
-      const response = await fetch(`https://backlify-v2.onrender.com/admin/logs`, {
+      let url = 'https://backlify-v2.onrender.com/admin/logs';
+      const username = localStorage.getItem('username');
+      if (username) {
+        url += `?XAuthUserId=${encodeURIComponent(username)}`;
+      }
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

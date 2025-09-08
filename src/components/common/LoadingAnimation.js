@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const LoadingAnimation = () => {
+const LoadingAnimation = memo(() => {
   const [loadingPhase, setLoadingPhase] = useState(0);
   const [progress, setProgress] = useState(0);
   
@@ -34,13 +34,13 @@ const LoadingAnimation = () => {
     };
   }, []);
   
-  // Generate random particles for background
-  const particles = Array.from({ length: 15 }, (_, i) => ({
+  // Generate random particles for background - memoized to prevent recreation
+  const particles = useMemo(() => Array.from({ length: 15 }, (_, i) => ({
     id: i,
     size: 3 + Math.random() * 8,
     x: Math.random() * 100,
     y: Math.random() * 100,
-  }));
+  })), []);
 
   return (
     <motion.div
@@ -290,6 +290,6 @@ const LoadingAnimation = () => {
 
     </motion.div>
   );
-};
+});
 
 export default LoadingAnimation; 

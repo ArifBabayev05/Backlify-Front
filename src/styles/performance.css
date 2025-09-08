@@ -1,0 +1,118 @@
+/* Performance-optimized CSS styles */
+
+/* Use CSS containment for better rendering performance */
+.schema-node {
+  contain: layout style paint;
+}
+
+.auth-container {
+  contain: layout;
+}
+
+/* Hardware acceleration for animations */
+.btn-gradient,
+.btn-google,
+.auth-tab {
+  will-change: transform;
+  transform: translateZ(0); /* Force hardware acceleration */
+}
+
+/* Optimize font loading */
+@font-display: swap;
+
+/* Critical CSS variables for faster paint */
+:root {
+  /* Color palette - defined once for performance */
+  --primary-blue: #3b82f6;
+  --primary-green: #10b981;
+  --primary-purple: #8b5cf6;
+  --primary-amber: #f59e0b;
+  --text-white: #ffffff;
+  --text-gray-500: #6b7280;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+/* Optimize images for performance */
+img {
+  image-rendering: optimizeQuality;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* Lazy loading skeleton styles */
+.loading-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Optimize scroll performance */
+.scrollable-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scroll-behavior: smooth;
+}
+
+/* Reduce repaints for frequently changing elements */
+.performance-optimized {
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Critical above-the-fold styles */
+.hero-section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* Defer non-critical animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Optimize list rendering */
+.virtualized-list {
+  overflow: hidden;
+  contain: strict;
+}
+
+.list-item {
+  contain: layout style;
+}
+
+/* Optimize form performance */
+.form-control-optimized {
+  will-change: background-color, border-color;
+}
+
+/* Memory-efficient gradients */
+.gradient-bg {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-purple) 100%);
+}
+
+/* Optimize table rendering */
+.performance-table {
+  table-layout: fixed;
+  contain: layout;
+}
+
+.performance-table td {
+  contain: layout style;
+}
