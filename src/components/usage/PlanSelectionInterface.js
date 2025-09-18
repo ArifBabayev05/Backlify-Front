@@ -9,7 +9,9 @@ import {
   ArrowRight,
   InfoCircle,
   Award,
-  Thunderbolt
+  Thunderbolt,
+  Server,
+  Database
 } from 'react-bootstrap-icons';
 import { toast } from 'react-hot-toast';
 import { getSubscriptionPlans, setXAuthUserId } from '../../utils/apiService';
@@ -190,21 +192,37 @@ const PlanSelectionInterface = ({
                 variants={itemVariants}
                 className="h-100"
               >
-                <Card 
-                  className={`h-100 border-0 position-relative ${
-                    plan.popular ? 'popular-plan' : 'glass'
-                  }`}
-                  style={{
-                    background: plan.popular 
-                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)'
-                      : 'rgba(255, 255, 255, 0.05)',
-                    border: plan.popular ? '2px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
-                    cursor: 'pointer',
-                    transform: selectedPlan?.id === plan.id ? 'scale(1.02)' : 'scale(1)',
-                    transition: 'transform 0.2s ease'
-                  }}
-                  onClick={() => handlePlanSelect(plan)}
-                >
+                 <Card 
+                   className={`card h-100 position-relative ${
+                     plan.popular ? 'popular-plan' : ''
+                   }`}
+                   style={{
+                     background: plan.popular 
+                       ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)'
+                       : 'rgba(255, 255, 255, 0.05)',
+                     border: plan.popular ? '2px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                     cursor: 'pointer',
+                     transform: selectedPlan?.id === plan.id ? 'translateY(-8px) scale(1.02)' : 'translateY(0)',
+                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                     backdropFilter: 'blur(12px)',
+                     boxShadow: plan.popular 
+                       ? '0 25px 50px -12px rgba(59, 130, 246, 0.25)' 
+                       : '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                   }}
+                   onClick={() => handlePlanSelect(plan)}
+                   onMouseEnter={(e) => {
+                     e.currentTarget.style.transform = 'translateY(-12px) scale(1.03)';
+                     e.currentTarget.style.boxShadow = plan.popular 
+                       ? '0 32px 64px -12px rgba(59, 130, 246, 0.35)' 
+                       : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+                   }}
+                   onMouseLeave={(e) => {
+                     e.currentTarget.style.transform = selectedPlan?.id === plan.id ? 'translateY(-8px) scale(1.02)' : 'translateY(0)';
+                     e.currentTarget.style.boxShadow = plan.popular 
+                       ? '0 25px 50px -12px rgba(59, 130, 246, 0.25)' 
+                       : '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                   }}
+                 >
                   {plan.popular && (
                     <div className="position-absolute top-0 start-50 translate-middle">
                       <Badge 
@@ -230,112 +248,142 @@ const PlanSelectionInterface = ({
                     </div>
                   )}
 
-                  <Card.Body className="p-4 text-center">
-                    <div className="mb-4">
-                      <div 
-                        className={`d-inline-flex align-items-center justify-content-center rounded-circle mb-3 ${
-                          plan.color === 'primary' ? 'text-primary' :
-                          plan.color === 'warning' ? 'text-warning' : 'text-secondary'
-                        }`}
-                        style={{ 
-                          width: '60px', 
-                          height: '60px',
-                          background: `rgba(${
-                            plan.color === 'primary' ? '59, 130, 246' :
-                            plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
-                          }, 0.1)`
-                        }}
-                      >
-                        {plan.icon}
-                      </div>
-                      
-                      <h4 className="text-white mb-2">{plan.name}</h4>
-                      <p className="text-white mb-3">{plan.description}</p>
-                      
-                      <div className="mb-4">
-                        <div className="display-6 fw-bold text-white">
-                          {formatPrice(plan.price, plan.currency, plan.period)}
-                        </div>
-                        {plan.period !== 'forever' && (
-                          <small className="text-white">billed monthly</small>
-                        )}
-                      </div>
-                    </div>
+                   <Card.Body className="card-body text-center">
+                     <div className="mb-6">
+                       <div 
+                         className={`d-inline-flex align-items-center justify-content-center rounded-3 mb-4 ${
+                           plan.color === 'primary' ? 'text-primary' :
+                           plan.color === 'warning' ? 'text-warning' : 'text-secondary'
+                         }`}
+                         style={{ 
+                           width: '80px', 
+                           height: '80px',
+                           background: `linear-gradient(135deg, rgba(${
+                             plan.color === 'primary' ? '59, 130, 246' :
+                             plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
+                           }, 0.1), rgba(${
+                             plan.color === 'primary' ? '59, 130, 246' :
+                             plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
+                           }, 0.05))`,
+                           border: `1px solid rgba(${
+                             plan.color === 'primary' ? '59, 130, 246' :
+                             plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
+                           }, 0.2)`,
+                           boxShadow: `0 8px 32px rgba(${
+                             plan.color === 'primary' ? '59, 130, 246' :
+                             plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
+                           }, 0.1)`
+                         }}
+                       >
+                         {plan.icon}
+                       </div>
+                       
+                       <h3 className="heading-4 text-white mb-3">{plan.name}</h3>
+                       <p className="body-base text-light mb-4">{plan.description}</p>
+                       
+                       <div className="mb-4">
+                         <div className="heading-2 text-white mb-2">
+                           {formatPrice(plan.price, plan.currency, plan.period)}
+                         </div>
+                         {plan.period !== 'forever' && (
+                           <span className="caption text-white">billed monthly</span>
+                         )}
+                       </div>
+                     </div>
 
-                    {/* Usage Limits Display */}
-                    {showUsageInfo && (
-                      <div className="mb-4 p-3 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
-                        <h6 className="text-white mb-2">Usage Limits</h6>
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <small className="text-white">API Requests</small>
-                          <small className="text-white fw-bold">
-                            {getUsageLimitText(plan)}
-                          </small>
-                        </div>
-                        <div className="d-flex justify-content-between align-items-center">
-                          <small className="text-white">Projects</small>
-                          <small className="text-white fw-bold">
-                            {plan.features.find(f => f.includes('Projects')) || 'Unlimited'}
-                          </small>
-                        </div>
-                      </div>
-                    )}
+                     {/* Usage Limits Display */}
+                     {showUsageInfo && (
+                       <div className="mb-6 p-4 rounded-2" style={{ 
+                         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)',
+                         border: '1px solid rgba(255, 255, 255, 0.15)',
+                         backdropFilter: 'blur(8px)'
+                       }}>
+                         <h6 className="heading-6 text-white mb-4">Usage Limits</h6>
+                         <div className="d-flex justify-content-between align-items-center mb-3">
+                           <div className="d-flex align-items-center gap-2">
+                             <div className="p-1 rounded-1" style={{ background: 'rgba(59, 130, 246, 0.2)' }}>
+                               <Server size={14} className="text-primary" />
+                             </div>
+                             <span className="body-small text-light">API Requests</span>
+                           </div>
+                           <span className="body-small text-white fw-medium">
+                             {getUsageLimitText(plan)}
+                           </span>
+                         </div>
+                         <div className="d-flex justify-content-between align-items-center">
+                           <div className="d-flex align-items-center gap-2">
+                             <div className="p-1 rounded-1" style={{ background: 'rgba(139, 92, 246, 0.2)' }}>
+                               <Database size={14} className="text-primary" />
+                             </div>
+                             <span className="body-small text-light">Projects</span>
+                           </div>
+                           <span className="body-small text-white fw-medium">
+                             {plan.features.find(f => f.includes('Projects')) || 'Unlimited'}
+                           </span>
+                         </div>
+                       </div>
+                     )}
 
-                    <div className="mb-4">
-                      <h6 className="text-white mb-3">Features included:</h6>
-                      <ul className="list-unstyled">
-                        {plan.features.map((feature, featureIndex) => (
-                          <li key={featureIndex} className="text-light mb-2 d-flex align-items-start">
-                            <CheckCircle className="text-success me-2 mt-1" size={16} />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                     <div className="mb-6">
+                       <h6 className="heading-6 text-white mb-4">Features included:</h6>
+                       <ul className="list-unstyled">
+                         {plan.features.map((feature, featureIndex) => (
+                           <li key={featureIndex} className="text-light mb-3 d-flex align-items-start gap-3">
+                             <div className="p-1 rounded-1" style={{ background: 'rgba(16, 185, 129, 0.2)' }}>
+                               <CheckCircle className="text-success" size={14} />
+                             </div>
+                             <span className="body-small">{feature}</span>
+                           </li>
+                         ))}
+                       </ul>
+                     </div>
 
-                    {plan.limitations.length > 0 && (
-                      <div className="mb-4">
-                        <h6 className="text-white mb-3">Limitations:</h6>
-                        <ul className="list-unstyled">
-                          {plan.limitations.map((limitation, limitationIndex) => (
-                            <li key={limitationIndex} className="text-white mb-1 small">
-                              • {limitation}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                     {plan.limitations.length > 0 && (
+                       <div className="mb-6">
+                         <h6 className="heading-6 text-white mb-4">Limitations:</h6>
+                         <ul className="list-unstyled">
+                           {plan.limitations.map((limitation, limitationIndex) => (
+                             <li key={limitationIndex} className="text-light mb-2 d-flex align-items-start gap-3">
+                               <div className="p-1 rounded-1" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
+                                 <div className="text-danger" style={{ width: '14px', height: '14px', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>•</div>
+                               </div>
+                               <span className="body-small">{limitation}</span>
+                             </li>
+                           ))}
+                         </ul>
+                       </div>
+                     )}
 
                     <div className="mt-auto">
                       {isCurrentPlan ? (
                         <Button
-                          variant="success"
+                          variant="secondary"
                           size="lg"
-                          className="w-100"
+                          className="btn btn-secondary btn-lg w-100"
                           disabled
                         >
-                          <CheckCircle className="me-2" />
+                          <CheckCircle size={16} className="me-2" />
                           Current Plan
                         </Button>
                       ) : isUpgrade ? (
                         <Button
                           variant="primary"
                           size="lg"
-                          className="w-100"
+                          className="btn btn-primary btn-lg w-100"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleUpgrade(plan);
                           }}
                           disabled={loading}
                         >
-                          <ArrowRight className="me-2" />
+                          <ArrowRight size={16} className="me-2" />
                           Upgrade to {plan.name}
                         </Button>
                       ) : (
                         <Button
-                          variant={status.variant}
+                          variant={status.variant === 'primary' ? 'primary' : 'outline'}
                           size="lg"
-                          className="w-100"
+                          className={`btn btn-${status.variant === 'primary' ? 'primary' : 'outline'} btn-lg w-100`}
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePlanSelect(plan);
@@ -357,17 +405,17 @@ const PlanSelectionInterface = ({
 
       {/* Additional Information */}
       <motion.div variants={itemVariants} className="mt-5">
-        <Alert variant="info" className="border-0 glass">
+        <Alert variant="info" className="border-0">
           <div className="d-flex align-items-start gap-3">
             <InfoCircle size={20} className="mt-1" />
-            <div>
-              <h6 className="mb-2">Plan Information</h6>
+            <div className="text-white">
+              <h6 className="mb-2 text-white">Plan Information</h6>
               <ul className="mb-0 small">
-                <li>All plans include real-time usage monitoring</li>
-                <li>You can upgrade or downgrade at any time</li>
-                <li>Usage limits reset monthly</li>
-                <li>Enterprise plans have unlimited usage</li>
-                <li>Get notifications when approaching limits</li>
+                <li className="text-white">All plans include real-time usage monitoring</li>
+                <li className="text-white">You can upgrade or downgrade at any time</li>
+                <li className="text-white">Usage limits reset monthly</li>
+                <li className="text-white">Enterprise plans have unlimited usage</li>
+                <li className="text-white">Get notifications when approaching limits</li>
               </ul>
             </div>
           </div>

@@ -291,7 +291,14 @@ export const apiRequest = async (endpoint, options = {}) => {
     headers['x-user-id'] = xAuthUserId;
     console.log('Setting user ID headers:', { xAuthUserId, 'x-user-id': xAuthUserId });
   } else {
-    console.log('No xAuthUserId available for headers');
+    // Try to get username from localStorage as fallback
+    const username = localStorage.getItem('username');
+    if (username) {
+      headers['x-user-id'] = username;
+      console.log('Using username from localStorage as fallback:', username);
+    } else {
+      console.log('No xAuthUserId or username available for headers');
+    }
   }
   
   // Also try to extract user ID from JWT token if available

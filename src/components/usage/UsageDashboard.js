@@ -162,25 +162,38 @@ const UsageDashboard = ({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
+      className="usage-dashboard"
     >
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4 className="text-white mb-0">
-          <Activity className="me-2" />
-          Usage Dashboard
-        </h4>
+      {/* Enhanced Header */}
+      <div className="d-flex justify-content-between align-items-center mb-5">
+        <div className="d-flex align-items-center">
+          <div className="me-3 p-3 rounded-3" style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+            border: '1px solid rgba(59, 130, 246, 0.2)'
+          }}>
+            <Activity size={24} className="text-primary" />
+          </div>
+          <div>
+            <h3 className="text-white mb-1 fw-bold">Usage Dashboard</h3>
+            <p className="text-light mb-0 small">Monitor your API usage and limits</p>
+          </div>
+        </div>
         <div className="d-flex align-items-center gap-3">
           {lastUpdated && (
-            <small className="text-white">
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </small>
+            <div className="text-end">
+              <small className="text-white d-block">Last updated</small>
+              <small className="text-white fw-medium">{lastUpdated.toLocaleTimeString()}</small>
+            </div>
           )}
           <Button 
-            variant="outline-light" 
+            variant="outline" 
             size="sm"
             onClick={fetchUsageData}
             disabled={loading}
+            className="btn btn-outline btn-sm d-flex align-items-center gap-2"
           >
             <ArrowClockwise size={14} className={loading ? 'spinning' : ''} />
+            <span className="d-none d-sm-inline">Refresh</span>
           </Button>
         </div>
       </div>
@@ -216,16 +229,25 @@ const UsageDashboard = ({
         {/* API Requests Usage */}
         <Col md={6}>
           <motion.div variants={itemVariants}>
-            <Card className="border-0 glass h-100">
+            <Card className="border-0 glass h-100 usage-card">
               <Card.Body className="p-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className="text-white mb-0">
-                    <Server className="me-2" />
-                    API Requests
-                  </h6>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div className="d-flex align-items-center">
+                    <div className="me-3 p-2 rounded-2" style={{
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                    }}>
+                      <Server size={20} className="text-success" />
+                    </div>
+                    <div>
+                      <h6 className="text-white mb-1 fw-bold">API Requests</h6>
+                      <small className="text-white">Monthly usage</small>
+                    </div>
+                  </div>
                   <Badge 
                     bg={requestsStatus.variant}
-                    className="d-flex align-items-center gap-1"
+                    className="d-flex align-items-center gap-1 px-3 py-2"
+                    style={{ borderRadius: 'var(--radius-lg)' }}
                   >
                     <requestsStatus.icon size={12} />
                     {requestsStatus.text}
@@ -233,36 +255,60 @@ const UsageDashboard = ({
                 </div>
 
                 {isUnlimited ? (
-                  <div className="text-center py-3">
-                    <Lightning className="text-warning mb-2" size={32} />
-                    <h5 className="text-warning mb-0">Unlimited</h5>
+                  <div className="text-center py-4">
+                    <div className="mb-3 p-3 rounded-3 d-inline-block" style={{
+                      background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                      border: '1px solid rgba(255, 193, 7, 0.2)'
+                    }}>
+                      <Lightning className="text-warning" size={32} />
+                    </div>
+                    <h5 className="text-warning mb-1 fw-bold">Unlimited</h5>
                     <small className="text-white">Enterprise Plan</small>
                   </div>
                 ) : (
                   <>
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <span className="text-light">
-                          {usageData.requests_count.toLocaleString()} / {usageData.limits?.requests?.toLocaleString() || 'N/A'}
-                        </span>
-                        <span className="text-white">
-                          {requestsPercentage}%
-                        </span>
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                          <h4 className="text-white mb-1 fw-bold">
+                            {usageData.requests_count.toLocaleString()}
+                          </h4>
+                          <small className="text-white">
+                            of {usageData.limits?.requests?.toLocaleString() || 'N/A'} requests
+                          </small>
+                        </div>
+                        <div className="text-end">
+                          <div className="h5 text-white mb-0 fw-bold">{requestsPercentage}%</div>
+                          <small className="text-white">used</small>
+                        </div>
                       </div>
                       <ProgressBar 
                         variant={getUsageColor(requestsPercentage)}
                         now={requestsPercentage}
-                        style={{ height: '8px' }}
+                        style={{ 
+                          height: '12px',
+                          borderRadius: 'var(--radius-lg)',
+                          background: 'rgba(255, 255, 255, 0.1)'
+                        }}
                       />
                     </div>
 
-                    <div className="d-flex justify-content-between">
-                      <small className="text-white">
-                        Remaining: {usageData.remaining_requests?.toLocaleString() || 'N/A'}
-                      </small>
-                      <small className="text-white">
-                        Reset: {new Date(usageData.month_start).toLocaleDateString()}
-                      </small>
+                    <div className="d-flex justify-content-between align-items-center p-3 rounded-2" style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}>
+                      <div>
+                        <small className="text-white d-block">Remaining</small>
+                        <small className="text-white fw-medium">
+                          {usageData.remaining_requests?.toLocaleString() || 'N/A'}
+                        </small>
+                      </div>
+                      <div className="text-end">
+                        <small className="text-white d-block">Reset Date</small>
+                        <small className="text-white fw-medium">
+                          {new Date(usageData.month_start).toLocaleDateString()}
+                        </small>
+                      </div>
                     </div>
                   </>
                 )}
@@ -274,16 +320,25 @@ const UsageDashboard = ({
         {/* Projects Usage */}
         <Col md={6}>
           <motion.div variants={itemVariants}>
-            <Card className="border-0 glass h-100">
+            <Card className="border-0 glass h-100 usage-card">
               <Card.Body className="p-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className="text-white mb-0">
-                    <Database className="me-2" />
-                    Projects
-                  </h6>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div className="d-flex align-items-center">
+                    <div className="me-3 p-2 rounded-2" style={{
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.2)'
+                    }}>
+                      <Database size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <h6 className="text-white mb-1 fw-bold">Projects</h6>
+                      <small className="text-white">Active projects</small>
+                    </div>
+                  </div>
                   <Badge 
                     bg={projectsStatus.variant}
-                    className="d-flex align-items-center gap-1"
+                    className="d-flex align-items-center gap-1 px-3 py-2"
+                    style={{ borderRadius: 'var(--radius-lg)' }}
                   >
                     <projectsStatus.icon size={12} />
                     {projectsStatus.text}
@@ -291,36 +346,60 @@ const UsageDashboard = ({
                 </div>
 
                 {isUnlimited ? (
-                  <div className="text-center py-3">
-                    <Lightning className="text-warning mb-2" size={32} />
-                    <h5 className="text-warning mb-0">Unlimited</h5>
+                  <div className="text-center py-4">
+                    <div className="mb-3 p-3 rounded-3 d-inline-block" style={{
+                      background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                      border: '1px solid rgba(255, 193, 7, 0.2)'
+                    }}>
+                      <Lightning className="text-warning" size={32} />
+                    </div>
+                    <h5 className="text-warning mb-1 fw-bold">Unlimited</h5>
                     <small className="text-white">Enterprise Plan</small>
                   </div>
                 ) : (
                   <>
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <span className="text-light">
-                          {usageData.projects_count} / {usageData.limits?.projects || 'N/A'}
-                        </span>
-                        <span className="text-white">
-                          {projectsPercentage}%
-                        </span>
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                          <h4 className="text-white mb-1 fw-bold">
+                            {usageData.projects_count}
+                          </h4>
+                          <small className="text-white">
+                            of {usageData.limits?.projects || 'N/A'} projects
+                          </small>
+                        </div>
+                        <div className="text-end">
+                          <div className="h5 text-white mb-0 fw-bold">{projectsPercentage}%</div>
+                          <small className="text-white">used</small>
+                        </div>
                       </div>
                       <ProgressBar 
                         variant={getUsageColor(projectsPercentage)}
                         now={projectsPercentage}
-                        style={{ height: '8px' }}
+                        style={{ 
+                          height: '12px',
+                          borderRadius: 'var(--radius-lg)',
+                          background: 'rgba(255, 255, 255, 0.1)'
+                        }}
                       />
                     </div>
 
-                    <div className="d-flex justify-content-between">
-                      <small className="text-white">
-                        Remaining: {usageData.remaining_projects || 'N/A'}
-                      </small>
-                      <small className="text-white">
-                        Plan: {usageData.user_plan?.toUpperCase() || 'N/A'}
-                      </small>
+                    <div className="d-flex justify-content-between align-items-center p-3 rounded-2" style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}>
+                      <div>
+                        <small className="text-white d-block">Remaining</small>
+                        <small className="text-white fw-medium">
+                          {usageData.remaining_projects || 'N/A'}
+                        </small>
+                      </div>
+                      <div className="text-end">
+                        <small className="text-white d-block">Current Plan</small>
+                        <small className="text-white fw-medium">
+                          {usageData.user_plan?.toUpperCase() || 'N/A'}
+                        </small>
+                      </div>
                     </div>
                   </>
                 )}
@@ -387,21 +466,60 @@ const UsageDashboard = ({
           to { transform: rotate(360deg); }
         }
         
-        .glass-card {
-          background: rgba(255, 255, 255, 0.05);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          transition: all 0.3s ease;
+        .usage-dashboard {
+          position: relative;
         }
         
-        .glass-card:hover {
+        .usage-card {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .usage-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+        
+        .usage-card:hover {
           background: rgba(255, 255, 255, 0.08);
-          transform: translateY(-2px);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          transform: translateY(-4px);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+          border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        .usage-card:hover::before {
+          opacity: 1;
         }
         
         .cursor-pointer {
           cursor: pointer;
+        }
+        
+        .progress-bar {
+          background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        }
+        
+        .progress-bar.bg-success {
+          background: linear-gradient(90deg, #10b981, #059669);
+        }
+        
+        .progress-bar.bg-warning {
+          background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+        
+        .progress-bar.bg-danger {
+          background: linear-gradient(90deg, #ef4444, #dc2626);
         }
       `}</style>
     </motion.div>

@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { toast } from 'react-hot-toast'; // Bildirişlər üçün
 import backlifyIcon from '../assets/icons/backlify.png';
 import subscriptionService from '../utils/subscriptionService';
+import IntroThemeSwitch from '../components/common/IntroThemeSwitch';
 
 // Using Bootstrap Icons and Unicode symbols instead of Font Awesome
 
@@ -511,7 +512,12 @@ const handleContactChange = (e) => {
     .frontend-icon:nth-child(3) { animation-delay: 1.2s; color: #DD0031; } /* Angular */
     @keyframes fade-in-right { to { opacity: 1; transform: translateX(0); } }
     .section-padding { padding: 6rem 0; } .section-header { margin-bottom: 4rem; }
-    .section-title { font-size: clamp(2.2rem, 5vw, 3rem); font-weight: 800; margin-bottom: 1rem; }
+    .section-title { 
+      font-size: clamp(2.2rem, 5vw, 3rem); 
+      font-weight: 800; 
+      margin-bottom: 1rem; 
+      text-align: center;
+    }
     .section-subtitle { font-size: 1.15rem; color: var(--text-secondary); max-width: 700px; margin: 0 auto; }
     .modal-content { background: #0f172a; border: 1px solid var(--border-color); border-radius: 16px; color: var(--text-primary); }
     .modal-header { border-bottom: 1px solid var(--border-color); }
@@ -540,6 +546,15 @@ const handleContactChange = (e) => {
       border-bottom: 1px solid var(--border-color);
       padding: 1rem 0;
     }
+    
+    /* Fix navbar spacing issue on IntroPage */
+    .navbar.fixed-top {
+      background: rgba(3, 7, 18, 0.9) !important;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 0;
+    }
     .navbar-brand {
       font-size: 1.7rem;
       font-weight: 800;
@@ -561,8 +576,36 @@ const handleContactChange = (e) => {
       position: relative;
       display: flex;
       align-items: center;
-      padding-top: 6rem;
+      padding-top: 5rem;
       background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.1), transparent);
+    }
+    
+    /* Fix page wrapper to eliminate black space */
+    .page-wrapper {
+      background: var(--dark-bg);
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* Ensure no margin/padding issues */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    
+    /* Fix navbar positioning */
+    .navbar.fixed-top {
+      z-index: 1030;
+      margin: 0;
+      padding: 0.75rem 0;
+    }
+    
+    /* Remove any default margins from sections */
+    .section {
+      margin: 0;
+      padding: 0;
     }
     .hero-title {
       font-size: clamp(2.5rem, 6vw, 4rem);
@@ -669,6 +712,7 @@ const handleContactChange = (e) => {
       font-size: clamp(2.2rem, 5vw, 3rem);
       font-weight: 800;
       margin-bottom: 1rem;
+      text-align: center;
     }
     .section-subtitle {
       font-size: 1.15rem;
@@ -1021,55 +1065,89 @@ const renderAnimationStage = () => (
     <>
       <style dangerouslySetInnerHTML={{ __html: css }} />
       
-      {/* Navigation */}
-      <Navbar expand="lg" className="navbar-custom fixed-top" variant="dark">
+      {/* Special Theme Switch for Intro Page */}
+      <IntroThemeSwitch />
+      
+      {/* Professional Navigation */}
+      <Navbar expand="lg" className="navbar fixed-top" variant="dark">
         <Container>
-                     <Navbar.Brand href="#" className="gradient-text d-flex align-items-center">
-             <img 
-               src={backlifyIcon} 
-               alt="Backlify Logo" 
-               width="24" 
-               height="24" 
-               className="me-2"
-               style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(78%) saturate(2476%) hue-rotate(235deg) brightness(102%) contrast(97%)' }}
-             /> 
-             Backlify
-           </Navbar.Brand>
-          <Navbar.Toggle aria-controls="navbarNav" />
+          <Navbar.Brand href="#" className="navbar-brand">
+            <img 
+              src={backlifyIcon} 
+              alt="Backlify Logo" 
+              width="32" 
+              height="32"
+              style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(78%) saturate(2476%) hue-rotate(235deg) brightness(102%) contrast(97%)' }}
+            /> 
+            Backlify
+          </Navbar.Brand>
+          
+          <Navbar.Toggle aria-controls="navbarNav" className="border-0" />
           <Navbar.Collapse id="navbarNav">
-            <Nav className="mx-auto gap-2">
-              <Nav.Link href="#features">Features</Nav.Link>
-              <Nav.Link href="#how-it-works">How It Works</Nav.Link>
-              <Nav.Link href="#about">About</Nav.Link>
-              <Nav.Link href="#pricing">Pricing</Nav.Link>
-              <Nav.Link href="#faq">FAQ</Nav.Link>
-              <Nav.Link href="/privacy">Privacy</Nav.Link>
+            <Nav className="mx-auto">
+              <Nav.Link href="#features" className="nav-link">Features</Nav.Link>
+              <Nav.Link href="#how-it-works" className="nav-link">How It Works</Nav.Link>
+              <Nav.Link href="#about" className="nav-link">About</Nav.Link>
+              <Nav.Link href="#pricing" className="nav-link">Pricing</Nav.Link>
+              <Nav.Link href="#faq" className="nav-link">FAQ</Nav.Link>
+              <Nav.Link href="/privacy" className="nav-link">Privacy</Nav.Link>
             </Nav>
-            <div className="d-flex gap-3 flex-column flex-lg-row align-items-center mt-3 mt-lg-0">
-              <Button variant="outline-light" href="/login" className="rounded-pill d-none d-lg-block">Log In</Button>
-                             <a href="/register" className="btn-gradient" onClick={handleStartClick}>
-                 🚀 Start for Free
-               </a>
+            
+            <div className="d-flex gap-3 align-items-center">
+              <Button 
+                variant="outline" 
+                href="/login" 
+                className="btn btn-outline d-none d-lg-flex"
+              >
+                Log In
+              </Button>
+              <Button 
+                variant="primary" 
+                href="/register" 
+                className="btn btn-primary"
+                onClick={handleStartClick}
+              >
+                🚀 Start for Free
+              </Button>
             </div>
           </Navbar.Collapse>
         </Container>
       </Navbar>
 
-      {/* Hero Section */}
-      <section className="hero-section">
+      <div className="page-wrapper">
+        {/* Professional Hero Section */}
+        <section className="hero-section section" style={{ marginTop: 0, paddingTop: '5rem' }}>
         <Container>
-          <Row className="align-items-center gy-5">
+          <Row className="align-items-center min-vh-100 landing-page">
             <Col lg={6} className="text-center text-lg-start">
-              <h1 className="hero-title">
-                Less Code, <span className="gradient-text">Build Fast.</span> <br />Instantly.
-              </h1>
-              <p className="hero-subtitle mx-auto mx-lg-0">
-                Backlify is the AI-powered platform that eliminates the need for backend coding. Simply describe your idea, and let our AI generate the database schema and ready-to-use APIs for you.
-              </p>
-              <div className="d-flex gap-3 flex-wrap justify-content-center justify-content-lg-start">
-                                 <a href="/register" className="btn-gradient" onClick={handleStartClick}>
-                   ✨ Start Building with AI
-                 </a>
+              <div className="hero-content">
+                <h1 className="heading-1 mb-6">
+                  Less Code, <span className="text-gradient">Build Fast.</span><br />
+                  Instantly.
+                </h1>
+                <p className="body-large text-light mb-8" style={{ maxWidth: '500px' }}>
+                  Backlify is the AI-powered platform that eliminates the need for backend coding. 
+                  Simply describe your idea, and let our AI generate the database schema and ready-to-use APIs for you.
+                </p>
+                <div className="d-flex gap-4 flex-wrap justify-content-center justify-content-lg-start">
+                  <Button 
+                    variant="primary" 
+                    size="lg"
+                    href="/register" 
+                    className="btn btn-primary btn-lg"
+                    onClick={handleStartClick}
+                  >
+                    ✨ Start Building with AI
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    href="#how-it-works" 
+                    className="btn btn-outline btn-lg"
+                  >
+                    Learn More
+                  </Button>
+                </div>
               </div>
             </Col>
             <Col lg={6}>
@@ -1533,6 +1611,7 @@ const renderAnimationStage = () => (
           </Button>
         </Modal.Footer>
       </Modal>
+      </div>
     </>
   );
 };

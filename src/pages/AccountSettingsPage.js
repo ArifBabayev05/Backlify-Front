@@ -29,7 +29,11 @@ import {
   getNotificationSettings, 
   updateNotificationSettings,
   getUserLogs,
-  getUserLogStats
+  getUserLogStats,
+  getRealApiUsageFromLogs,
+  setXAuthUserId,
+  getUserDebugInfo,
+  getSubscriptionPlans
 } from '../utils/apiService';
 
 const AccountSettingsPage = () => {
@@ -46,6 +50,10 @@ const AccountSettingsPage = () => {
   const [error, setError] = useState(null);
   const [logStats, setLogStats] = useState(null);
   const [timeRange, setTimeRange] = useState('last7days');
+  const [userDebugInfo, setUserDebugInfo] = useState(null);
+  const [debugInfoLoading, setDebugInfoLoading] = useState(false);
+  const [plansData, setPlansData] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
 
 
   // Profile form state
@@ -90,12 +98,22 @@ const AccountSettingsPage = () => {
     setError(null);
     
     try {
+      // Get username from localStorage
+      const username = localStorage.getItem('username') || user?.username;
+      
+      // Ensure XAuthUserId is set before making any API calls
+      if (username) {
+        setXAuthUserId(username);
+        // Add a small delay to ensure the XAuthUserId is properly set
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       // Load user's APIs to get usage statistics
       const apisData = await apiRequest('/my-apis', { method: 'GET' });
       const userApis = apisData.apis || [];
       
-      // Create mock user profile from available data
-      const mockProfile = {
+      // Create user profile from available data
+      const userProfile = {
         firstName: user?.username?.split(' ')[0] || 'User',
         lastName: user?.username?.split(' ')[1] || '',
         email: user?.email || 'user@example.com',
@@ -103,67 +121,274 @@ const AccountSettingsPage = () => {
         phone: '+1 (555) 123-4567'
       };
       
-      setUserProfile(mockProfile);
+      setUserProfile(userProfile);
       
-      // Update profile form with mock data
+      // Update profile form with user data
       setProfileForm({
-        firstName: mockProfile.firstName,
-        lastName: mockProfile.lastName,
-        email: mockProfile.email,
-        company: mockProfile.company,
-        phone: mockProfile.phone
+        firstName: userProfile.firstName,
+        lastName: userProfile.lastName,
+        email: userProfile.email,
+        company: userProfile.company,
+        phone: userProfile.phone
       });
 
-      // Create mock subscription data
-      const mockSubscription = {
-        planName: 'Free Plan',
-        plan: 'basic',
-        status: 'active',
-        price: 0,
-        currency: 'AZN',
-        features: {
-          apiCalls: 1000,
-          maxProjects: 5
+      // Load real subscription data from getUserDebugInfo and getSubscriptionPlans
+      if (username) {
+        try {
+          setDebugInfoLoading(true);
+          setPlansLoading(true);
+          
+          // Load both debug info and plans data
+          const [debugInfo, plans] = await Promise.all([
+            getUserDebugInfo(username),
+            getSubscriptionPlans()
+          ]);
+          
+          setUserDebugInfo(debugInfo);
+          setPlansData(plans);
+          
+          // Find current plan from plans data
+          const currentPlanId = debugInfo?.user_plan || 'basic';
+          const currentPlan = plans.find(p => p.id === currentPlanId) || plans[0];
+          
+          // Helper function to format limits
+          const formatLimit = (limit) => {
+            return limit === -1 ? 'Unlimited' : limit.toString();
+          };
+          
+          const subscriptionData = {
+            planName: currentPlan?.name || 'Basic Plan',
+            plan: currentPlanId,
+            status: 'active',
+            price: currentPlan?.price || 0,
+            currency: currentPlan?.currency || 'AZN',
+            features: {
+              apiCalls: formatLimit(debugInfo?.limits?.requests || 1000),
+              maxProjects: formatLimit(debugInfo?.limits?.projects || 5)
+            },
+            usage: {
+              requestsCount: debugInfo?.requests_count || 0,
+              projectsCount: debugInfo?.projects_count || 0
+            },
+            isOverLimit: debugInfo?.isOverLimit || false,
+            planFeatures: currentPlan?.features || []
+          };
+          setSubscription(subscriptionData);
+
+          // Create API usage data from real debug info
+          const requestsLimit = debugInfo?.limits?.requests || 1000;
+          const apiUsageData = {
+            totalCalls: debugInfo?.requests_count || 0,
+            limit: requestsLimit,
+            limitDisplay: requestsLimit === -1 ? 'Unlimited' : requestsLimit.toString(),
+            thisMonth: debugInfo?.requests_count || 0,
+            lastMonth: Math.max(0, (debugInfo?.requests_count || 0) - 10), // Estimate
+            isOverLimit: debugInfo?.isOverLimit || false,
+            remaining: debugInfo?.remaining_requests || 0,
+            monthStart: debugInfo?.month_start || new Date().toISOString()
+          };
+          setApiUsage(apiUsageData);
+        } catch (debugError) {
+          console.warn('Could not load debug info or plans, using fallback:', debugError);
+          // Fallback to basic plan
+          const fallbackSubscription = {
+            planName: 'Basic Plan',
+            plan: 'basic',
+            status: 'active',
+            price: 0,
+            currency: 'AZN',
+            features: {
+              apiCalls: '1000',
+              maxProjects: '5'
+            }
+          };
+          setSubscription(fallbackSubscription);
+          
+          const fallbackUsage = {
+            totalCalls: 0,
+            limit: 1000,
+            limitDisplay: '1000',
+            thisMonth: 0,
+            lastMonth: 0,
+            isOverLimit: false,
+            remaining: 1000,
+            monthStart: new Date().toISOString()
+          };
+          setApiUsage(fallbackUsage);
+        } finally {
+          setDebugInfoLoading(false);
+          setPlansLoading(false);
         }
-      };
-      setSubscription(mockSubscription);
+      } else {
+        // Fallback if no username
+        const fallbackSubscription = {
+          planName: 'Basic Plan',
+          plan: 'basic',
+          status: 'active',
+          price: 0,
+          currency: 'AZN',
+          features: {
+            apiCalls: '1000',
+            maxProjects: '5'
+          }
+        };
+        setSubscription(fallbackSubscription);
+        
+        const fallbackUsage = {
+          totalCalls: 0,
+          limit: 1000,
+          limitDisplay: '1000',
+          thisMonth: 0,
+          lastMonth: 0,
+          isOverLimit: false,
+          remaining: 1000,
+          monthStart: new Date().toISOString()
+        };
+        setApiUsage(fallbackUsage);
+      }
 
-      // Create mock API usage data based on actual APIs
-      const mockUsage = {
-        totalCalls: userApis.length * 50, // Mock usage based on number of APIs
-        limit: 1000,
-        thisMonth: userApis.length * 25,
-        lastMonth: userApis.length * 20
-      };
-      setApiUsage(mockUsage);
-
-      // Create mock request logs
-      const mockLogs = userApis.slice(0, 10).map((api, index) => ({
-        id: index + 1,
-        timestamp: new Date(Date.now() - index * 3600000).toISOString(),
-        endpoint: `/api/${api.id}/users`,
-        method: 'GET',
-        status: 200,
-        responseTime: Math.floor(Math.random() * 200) + 50,
-        ip: '192.168.1.1'
-      }));
-      setRequestLogs(mockLogs);
-
-      // Create mock log statistics
-      const mockStats = {
-        summary: {
-          totalRequests: mockLogs.length * 10,
-          successRate: 95,
-          avgResponseTime: 120
-        },
-        topEndpoints: userApis.slice(0, 5).map(api => ({
-          endpoint: `/api/${api.id}/users`,
-          count: Math.floor(Math.random() * 100) + 10,
-          success: Math.floor(Math.random() * 90) + 5,
-          avgResponseTime: Math.floor(Math.random() * 200) + 50
-        }))
-      };
-      setLogStats(mockStats);
+      // Load real request logs from admin endpoint
+      const usernameForLogs = localStorage.getItem('username') || user?.username;
+      try {
+        // Get real usage data from logs
+        const realUsageData = await getRealApiUsageFromLogs(null, usernameForLogs);
+        
+        // For request logs, we need to fetch actual logs from admin endpoint
+        const logsResponse = await fetch(`https://backlify-v2.onrender.com/admin/logs?timeRange=last7days&XAuthUserId=${encodeURIComponent(usernameForLogs)}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (logsResponse.ok) {
+          const logsData = await logsResponse.json();
+          const logs = logsData.logs || [];
+          
+          // Process logs to get recent API requests
+          const processedLogs = logs.slice(0, 10).map((log, index) => ({
+            id: index + 1,
+            timestamp: log.timestamp || new Date().toISOString(),
+            endpoint: log.endpoint || log.path || 'Unknown',
+            method: log.method || 'GET',
+            status: log.status || log.status_code || 200,
+            responseTime: log.responseTime || log.duration || 0,
+            ip: log.ip || log.clientIP || 'Unknown'
+          }));
+          setRequestLogs(processedLogs);
+          
+          // Filter logs to only include API requests (is_api_request: true) and exclude api/user/plans
+          const apiLogs = logs.filter(log => {
+            const endpoint = log.endpoint || log.path || '';
+            return log.is_api_request === true && 
+                   endpoint.includes('/api/') && 
+                   !endpoint.includes('/api/user/plans') && 
+                   !endpoint.includes('/debug-user-info') &&
+                   !endpoint.includes('/create-api-from-schema') &&
+                   !endpoint.includes('/admin/');
+          });
+          
+          // Create log statistics from filtered API data
+          const totalRequests = apiLogs.length;
+          const successfulRequests = apiLogs.filter(log => (log.status || log.status_code) >= 200 && (log.status || log.status_code) < 300).length;
+          const successRate = totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0;
+          const avgResponseTime = totalRequests > 0 ? 
+            Math.round(apiLogs.reduce((sum, log) => {
+              let responseTime = 0;
+              if (log.responseTime) {
+                responseTime = parseFloat(log.responseTime) || 0;
+              } else if (log.duration) {
+                responseTime = parseFloat(log.duration) || 0;
+              } else if (log.response_time) {
+                responseTime = parseFloat(log.response_time) || 0;
+              }
+              return sum + responseTime;
+            }, 0) / totalRequests) : 0;
+          
+          // Group endpoints by endpoint path to avoid duplicates and count requests
+          const endpointGroups = {};
+          apiLogs.forEach(log => {
+            const endpoint = log.endpoint || log.path || 'Unknown';
+            if (!endpointGroups[endpoint]) {
+              endpointGroups[endpoint] = {
+                endpoint: endpoint,
+                count: 0,
+                success: 0,
+                totalResponseTime: 0
+              };
+            }
+            endpointGroups[endpoint].count++;
+            if ((log.status || log.status_code) >= 200 && (log.status || log.status_code) < 300) {
+              endpointGroups[endpoint].success++;
+            }
+            // Parse response time - handle different formats
+            let responseTime = 0;
+            if (log.responseTime) {
+              responseTime = parseFloat(log.responseTime) || 0;
+            } else if (log.duration) {
+              responseTime = parseFloat(log.duration) || 0;
+            } else if (log.response_time) {
+              responseTime = parseFloat(log.response_time) || 0;
+            }
+            endpointGroups[endpoint].totalResponseTime += responseTime;
+          });
+          
+          // Convert to array and calculate averages
+          const topEndpoints = Object.values(endpointGroups)
+            .map(group => {
+              const successRate = group.count > 0 ? (group.success / group.count) * 100 : 0;
+              const avgResponseTime = group.count > 0 ? group.totalResponseTime / group.count : 0;
+              
+              return {
+                endpoint: group.endpoint,
+                count: group.count,
+                success: Math.round(successRate * 10) / 10, // Round to 1 decimal place
+                avgResponseTime: Math.round(avgResponseTime) // Round to whole number
+              };
+            })
+            .sort((a, b) => b.count - a.count) // Sort by request count
+            .slice(0, 10); // Take top 10 for better visibility
+          
+          const realStats = {
+            summary: {
+              totalRequests: totalRequests,
+              successRate: successRate,
+              avgResponseTime: avgResponseTime
+            },
+            topEndpoints: topEndpoints
+          };
+          
+          // Debug logging
+          console.log('Real API logs data:', {
+            totalLogs: logs.length,
+            apiLogs: apiLogs.length,
+            topEndpoints: topEndpoints.length,
+            sampleEndpoint: topEndpoints[0],
+            sampleLog: apiLogs[0],
+            successRate: successRate,
+            avgResponseTime: avgResponseTime
+          });
+          
+          setLogStats(realStats);
+        } else {
+          throw new Error('Failed to fetch logs');
+        }
+      } catch (logError) {
+        console.warn('Could not load real logs, using fallback:', logError);
+        // Fallback to empty array if logs fail
+        setRequestLogs([]);
+        
+        // Fallback stats - show that no data is available
+        const fallbackStats = {
+          summary: {
+            totalRequests: 0,
+            successRate: 0,
+            avgResponseTime: 0
+          },
+          topEndpoints: []
+        };
+        
+        console.warn('Using fallback stats - no real data available');
+        setLogStats(fallbackStats);
+      }
 
       // Create mock notification settings
       const mockNotifications = {
@@ -342,7 +567,23 @@ const AccountSettingsPage = () => {
 
   const getUsagePercentage = () => {
     if (!apiUsage) return 0;
-    return (apiUsage.totalCalls / apiUsage.limit) * 100;
+    // If limit is -1 (unlimited), show 0% progress
+    if (apiUsage.limit === -1) return 0;
+    if (apiUsage.limit === 0) return 0;
+    return Math.min((apiUsage.totalCalls / apiUsage.limit) * 100, 100);
+  };
+
+  const getUsageColor = (percentage) => {
+    if (percentage >= 90) return 'danger';
+    if (percentage >= 75) return 'warning';
+    return 'success';
+  };
+
+  const getUsageStatus = (percentage) => {
+    if (percentage >= 100) return { text: 'Limit Exceeded', variant: 'danger' };
+    if (percentage >= 90) return { text: 'Near Limit', variant: 'warning' };
+    if (percentage >= 75) return { text: 'High Usage', variant: 'info' };
+    return { text: 'Normal', variant: 'success' };
   };
 
   const containerVariants = {
@@ -371,10 +612,10 @@ const AccountSettingsPage = () => {
 
   return (
     <RequireAuth>
-      <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-        <NavBar />
+      <NavBar />
+      <div className="page-wrapper account-settings-page">
         
-        <Container className="py-5" style={{ marginTop: '80px' }}>
+        <Container className="py-5">
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -407,94 +648,9 @@ const AccountSettingsPage = () => {
               )}
             </motion.div>
 
-            {/* Time Range Selector */}
-            <motion.div variants={itemVariants} className="mb-4">
-              <div className="d-flex justify-content-center">
-                <div className="btn-group" role="group">
-                  {['today', 'yesterday', 'last7days', 'last30days', 'last90days'].map((range) => (
-                    <Button
-                      key={range}
-                      variant={timeRange === range ? 'primary' : 'outline-light'}
-                      size="sm"
-                      onClick={() => handleTimeRangeChange(range)}
-                      disabled={loading}
-                    >
-                      {range === 'last7days' ? '7 Days' :
-                       range === 'last30days' ? '30 Days' :
-                       range === 'last90days' ? '90 Days' :
-                       range.charAt(0).toUpperCase() + range.slice(1)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
+            
 
-            {/* Quick Stats */}
-            <motion.div variants={itemVariants} className="mb-5">
-              {loading ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                  <p className="text-white mt-3">Loading account data...</p>
-                </div>
-              ) : (
-                <Row className="g-4">
-                  <Col md={3}>
-                    <Card className="glass border-0 h-100">
-                      <Card.Body className="text-center">
-                        <div className="d-flex justify-content-center mb-3">
-                          <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
-                            <Activity size={24} className="text-white" />
-                          </div>
-                        </div>
-                                              <h5 className="text-white mb-1">{logStats?.summary?.totalRequests || 0}</h5>
-                      <p className="text-white mb-0">Total Requests</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                <Col md={3}>
-                  <Card className="glass border-0 h-100">
-                    <Card.Body className="text-center">
-                      <div className="d-flex justify-content-center mb-3">
-                        <div className="rounded-circle bg-success d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
-                          <BarChart size={24} className="text-white" />
-                        </div>
-                      </div>
-                      <h5 className="text-white mb-1">{logStats?.summary?.successRate || '0'}%</h5>
-                      <p className="text-white mb-0">Success Rate</p>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="glass border-0 h-100">
-                    <Card.Body className="text-center">
-                      <div className="d-flex justify-content-center mb-3">
-                        <div className="rounded-circle bg-warning d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
-                          <Star size={24} className="text-white" />
-                        </div>
-                      </div>
-                      <h5 className="text-white mb-1">{subscription?.planName || 'Free'}</h5>
-                      <p className="text-white mb-0">Current Plan</p>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="glass border-0 h-100">
-                    <Card.Body className="text-center">
-                      <div className="d-flex justify-content-center mb-3">
-                        <div className="rounded-circle bg-info d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
-                          <Calendar size={24} className="text-white" />
-                        </div>
-                      </div>
-                      <h5 className="text-white mb-1">{logStats?.summary?.avgResponseTime || 0}ms</h5>
-                      <p className="text-white mb-0">Avg Response Time</p>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                </Row>
-              )}
-            </motion.div>
+         
 
             {/* Main Content */}
             <motion.div variants={itemVariants}>
@@ -516,67 +672,151 @@ const AccountSettingsPage = () => {
                         <Row className="g-4">
                           {/* API Usage */}
                           <Col lg={6}>
-                            <Card className="border-0" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
-                              <Card.Body>
-                                <h5 className="text-white mb-3">API Usage</h5>
-                                <div className="mb-3">
-                                  <div className="d-flex justify-content-between mb-2">
-                                    <span className="text-light">This Month</span>
-                                    <span className="text-white fw-bold">
-                                      {apiUsage?.totalCalls || 0} / {apiUsage?.limit || 0}
-                                    </span>
-                                  </div>
-                                  <ProgressBar 
-                                    now={getUsagePercentage()} 
-                                    variant={getUsagePercentage() > 80 ? 'danger' : getUsagePercentage() > 60 ? 'warning' : 'success'}
-                                    style={{ height: '8px' }}
-                                  />
-                                </div>
-                                <div className="row g-3">
-                                  <div className="col-6">
-                                    <div className="text-center">
-                                      <h6 className="text-success mb-1">{apiUsage?.thisMonth || 0}</h6>
-                                      <small className="text-white">This Month</small>
+                            <Card className="border-0 glass usage-card h-100">
+                              <Card.Body className="p-4">
+                                <div className="d-flex justify-content-between align-items-center mb-4">
+                                  <div className="d-flex align-items-center">
+                                    <div className="me-3 p-2 rounded-2" style={{
+                                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                                    }}>
+                                      <Activity size={20} className="text-success" />
+                                    </div>
+                                    <div>
+                                      <h5 className="text-white mb-1 fw-bold">API Usage</h5>
+                                      <small className="text-white">Monthly usage</small>
                                     </div>
                                   </div>
-                                  <div className="col-6">
-                                    <div className="text-center">
-                                      <h6 className="text-info mb-1">{apiUsage?.lastMonth || 0}</h6>
-                                      <small className="text-white">Last Month</small>
-                                    </div>
-                                  </div>
+                                  <Badge 
+                                    bg={getUsageColor(getUsagePercentage())}
+                                    className="d-flex align-items-center gap-1 px-3 py-2"
+                                    style={{ borderRadius: 'var(--radius-lg)' }}
+                                  >
+                                    {getUsageStatus(getUsagePercentage()).text}
+                                  </Badge>
                                 </div>
+
+                                {apiUsage?.limit === -1 ? (
+                                  <div className="text-center py-4">
+                                    <div className="mb-3 p-3 rounded-3 d-inline-block" style={{
+                                      background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                                      border: '1px solid rgba(255, 193, 7, 0.2)'
+                                    }}>
+                                      <Star className="text-warning" size={32} />
+                                    </div>
+                                    <h5 className="text-warning mb-1 fw-bold">Unlimited</h5>
+                                    <small className="text-white">Enterprise Plan</small>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="mb-4">
+                                      <div className="d-flex justify-content-between align-items-center mb-3">
+                                        <div>
+                                          <h4 className="text-white mb-1 fw-bold">
+                                            {apiUsage?.totalCalls?.toLocaleString() || 0}
+                                          </h4>
+                                          <small className="text-white">
+                                            of {apiUsage?.limitDisplay || '1000'} requests
+                                          </small>
+                                        </div>
+                                        <div className="text-end">
+                                          <div className="h5 text-white mb-0 fw-bold">{getUsagePercentage().toFixed(1)}%</div>
+                                          <small className="text-white">used</small>
+                                        </div>
+                                      </div>
+                                      <ProgressBar 
+                                        variant={getUsageColor(getUsagePercentage())}
+                                        now={getUsagePercentage()}
+                                        style={{ 
+                                          height: '12px',
+                                          borderRadius: 'var(--radius-lg)',
+                                          background: 'rgba(255, 255, 255, 0.1)'
+                                        }}
+                                      />
+                                    </div>
+
+                                    <div className="d-flex justify-content-between align-items-center p-3 rounded-2" style={{
+                                      background: 'rgba(255, 255, 255, 0.03)',
+                                      border: '1px solid rgba(255, 255, 255, 0.05)'
+                                    }}>
+                                      <div>
+                                        <small className="text-white d-block">Remaining</small>
+                                        <small className="text-white fw-medium">
+                                          {apiUsage?.remaining?.toLocaleString() || 'N/A'}
+                                        </small>
+                                      </div>
+                                      <div className="text-end">
+                                        <small className="text-white d-block">Reset Date</small>
+                                        <small className="text-white fw-medium">
+                                          {apiUsage?.monthStart ? new Date(apiUsage.monthStart).toLocaleDateString() : 'N/A'}
+                                        </small>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
                               </Card.Body>
                             </Card>
                           </Col>
 
                           {/* Subscription Info */}
                           <Col lg={6}>
-                            <Card className="border-0" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
-                              <Card.Body>
-                                <h5 className="text-white mb-3">Subscription</h5>
-                                <div className="d-flex align-items-center justify-content-between mb-3">
-                                  <div>
-                                    <h6 className="text-white mb-1">{subscription?.planName || 'Free Plan'}</h6>
-                                    <Badge bg={subscription?.status === 'active' ? 'success' : 'secondary'}>
-                                      {subscription?.status || 'inactive'}
-                                    </Badge>
+                            <Card className="border-0 glass usage-card h-100">
+                              <Card.Body className="p-4">
+                                <div className="d-flex justify-content-between align-items-center mb-4">
+                                  <div className="d-flex align-items-center">
+                                    <div className="me-3 p-2 rounded-2" style={{
+                                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                                      border: '1px solid rgba(139, 92, 246, 0.2)'
+                                    }}>
+                                      <Star size={20} className="text-primary" />
+                                    </div>
+                                    <div>
+                                      <h5 className="text-white mb-1 fw-bold">Subscription</h5>
+                                      <small className="text-white">Current plan</small>
+                                    </div>
                                   </div>
-                                  <div className="text-end">
-                                    <h6 className="text-white mb-1">
-                                      {subscription?.price || 0} {subscription?.currency || 'AZN'}
-                                    </h6>
-                                    <small className="text-white">per month</small>
+                                  <Badge 
+                                    bg={subscription?.status === 'active' ? 'success' : 'secondary'}
+                                    className="d-flex align-items-center gap-1 px-3 py-2"
+                                    style={{ borderRadius: 'var(--radius-lg)' }}
+                                  >
+                                    {subscription?.status || 'inactive'}
+                                  </Badge>
+                                </div>
+
+                                <div className="mb-4">
+                                  <div className="d-flex align-items-center justify-content-between mb-3">
+                                    <div>
+                                      <h4 className="text-white mb-1 fw-bold">{subscription?.planName || 'Free Plan'}</h4>
+                                      <small className="text-white">Current subscription</small>
+                                    </div>
+                                    <div className="text-end">
+                                      <h5 className="text-white mb-1 fw-bold">
+                                        {subscription?.price || 0} {subscription?.currency || 'AZN'}
+                                      </h5>
+                                      <small className="text-white">per month</small>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="row g-2 mb-3">
+
+                                <div className="row g-3 mb-4">
                                   <div className="col-6">
-                                    <small className="text-white">API Calls Limit</small>
-                                    <div className="text-white fw-bold">{subscription?.features?.apiCalls || 0}</div>
+                                    <div className="p-3 rounded-2" style={{
+                                      background: 'rgba(255, 255, 255, 0.03)',
+                                      border: '1px solid rgba(255, 255, 255, 0.05)'
+                                    }}>
+                                      <small className="text-white d-block mb-1">API Calls Limit</small>
+                                      <div className="text-white fw-bold h5 mb-0">{subscription?.features?.apiCalls || '1000'}</div>
+                                    </div>
                                   </div>
                                   <div className="col-6">
-                                    <small className="text-white">Max Projects</small>
-                                    <div className="text-white fw-bold">{subscription?.features?.maxProjects || 0}</div>
+                                    <div className="p-3 rounded-2" style={{
+                                      background: 'rgba(255, 255, 255, 0.03)',
+                                      border: '1px solid rgba(255, 255, 255, 0.05)'
+                                    }}>
+                                      <small className="text-white d-block mb-1">Max Projects</small>
+                                      <div className="text-white fw-bold h5 mb-0">{subscription?.features?.maxProjects || '5'}</div>
+                                    </div>
                                   </div>
                                 </div>
                                 
@@ -587,8 +827,9 @@ const AccountSettingsPage = () => {
                                     size="sm"
                                     onClick={handleManageBilling}
                                     disabled={loading}
+                                    className="d-flex align-items-center gap-2"
                                   >
-                                    <Star className="me-1" />
+                                    <Star size={16} />
                                     Manage Billing
                                   </Button>
                                   
@@ -601,8 +842,9 @@ const AccountSettingsPage = () => {
                                         handleUpgradeSubscription(nextPlan);
                                       }}
                                       disabled={loading}
+                                      className="d-flex align-items-center gap-2"
                                     >
-                                      <ArrowRight className="me-1" />
+                                      <ArrowRight size={16} />
                                       Upgrade Plan
                                     </Button>
                                   )}
@@ -624,37 +866,128 @@ const AccountSettingsPage = () => {
 
                           {/* Top Endpoints */}
                           <Col lg={12}>
-                            <Card className="border-0" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
-                              <Card.Body>
-                                <h5 className="text-white mb-3">Top Endpoints</h5>
-                                <div className="table-responsive">
-                                  <Table variant="dark" className="mb-0">
-                                    <thead>
-                                      <tr>
-                                        <th>Endpoint</th>
-                                        <th>Requests</th>
-                                        <th>Success Rate</th>
-                                        <th>Avg Time</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {logStats?.topEndpoints?.map((endpoint, index) => (
-                                        <tr key={index}>
-                                          <td className="text-light">{endpoint.endpoint}</td>
-                                          <td className="text-white">{endpoint.count}</td>
-                                          <td>
-                                            <Badge bg={endpoint.success / endpoint.count * 100 > 95 ? 'success' : endpoint.success / endpoint.count * 100 > 90 ? 'warning' : 'danger'}>
-                                              {((endpoint.success / endpoint.count) * 100).toFixed(1)}%
-                                            </Badge>
-                                          </td>
-                                          <td>
-                                            <Badge bg="info">{endpoint.avgResponseTime}ms</Badge>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </Table>
+                            <Card className="border-0 glass" style={{ 
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              backdropFilter: 'blur(12px)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}>
+                              <Card.Body className="p-4">
+                                <div className="d-flex justify-content-between align-items-center mb-4">
+                                  <div className="d-flex align-items-center">
+                                    <div className="me-3 p-2 rounded-2" style={{
+                                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)'
+                                    }}>
+                                      <BarChart size={20} className="text-primary" />
+                                    </div>
+                                    <div>
+                                      <h5 className="text-white mb-1 fw-bold">Top Endpoints</h5>
+                                      <small className="text-white">Most used API endpoints (Last 7 days)</small>
+                                    </div>
+                                  </div>
+                                  <div className="d-flex align-items-center gap-3">
+                                    <Badge 
+                                      bg="info"
+                                      className="d-flex align-items-center gap-1 px-3 py-2"
+                                      style={{ borderRadius: 'var(--radius-lg)' }}
+                                    >
+                                      {logStats?.topEndpoints?.length || 0} endpoints
+                                    </Badge>
+                                    <Button 
+                                      variant="outline-primary" 
+                                      size="sm"
+                                      onClick={() => loadUserData()}
+                                      disabled={loading}
+                                      className="d-flex align-items-center gap-2"
+                                    >
+                                      <Activity size={14} />
+                                      Refresh
+                                    </Button>
+                                  </div>
                                 </div>
+                                
+                                {logStats?.topEndpoints?.length > 0 ? (
+                                  <div className="table-responsive">
+                                    <Table variant="dark" className="mb-0">
+                                      <thead>
+                                        <tr>
+                                          <th className="text-white fw-medium">Endpoint</th>
+                                          <th className="text-white fw-medium">Requests</th>
+                                          <th className="text-white fw-medium">Success Rate</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {logStats.topEndpoints.map((endpoint, index) => {
+                                          // Validate endpoint data
+                                          const isValidEndpoint = endpoint && 
+                                            typeof endpoint.count === 'number' && 
+                                            typeof endpoint.success === 'number' && 
+                                            typeof endpoint.avgResponseTime === 'number';
+                                          
+                                          if (!isValidEndpoint) {
+                                            console.warn('Invalid endpoint data:', endpoint);
+                                            return null;
+                                          }
+                                          
+                                          return (
+                                            <tr key={index} className="border-0">
+                                              <td className="text-light py-3">
+                                                <div className="d-flex align-items-center">
+                                                  <div className="me-2 p-1 rounded" style={{
+                                                    background: 'rgba(59, 130, 246, 0.1)',
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                  }}>
+                                                    <Activity size={12} className="text-primary" />
+                                                  </div>
+                                                  <span className="text-truncate" style={{ maxWidth: '200px' }} title={endpoint.endpoint}>
+                                                    {endpoint.endpoint || 'Unknown'}
+                                                  </span>
+                                                </div>
+                                              </td>
+                                              <td className="text-white py-3 fw-medium">{endpoint.count.toLocaleString()}</td>
+                                              <td className="py-3">
+                                                <Badge 
+                                                  bg={endpoint.success > 95 ? 'success' : endpoint.success > 90 ? 'warning' : 'danger'}
+                                                  className="px-3 py-2"
+                                                  style={{ borderRadius: 'var(--radius-md)' }}
+                                                >
+                                                  {endpoint.success.toFixed(1)}%
+                                                </Badge>
+                                              </td>
+                                              
+                                            </tr>
+                                          );
+                                        }).filter(Boolean)}
+                                      </tbody>
+                                    </Table>
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-5">
+                                    <div className="mb-3 p-3 rounded-3 d-inline-block" style={{
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                      <BarChart size={32} className="text-white" />
+                                    </div>
+                                    <h6 className="text-white mb-2">No endpoint data available</h6>
+                                    <small className="text-white mb-3 d-block">API usage data will appear here once you start making requests to your APIs</small>
+                                    <Button 
+                                      variant="outline-primary" 
+                                      size="sm"
+                                      onClick={() => loadUserData()}
+                                      disabled={loading}
+                                      className="d-flex align-items-center gap-2 mx-auto"
+                                    >
+                                      <Activity size={14} />
+                                      {loading ? 'Loading...' : 'Refresh Data'}
+                                    </Button>
+                                  </div>
+                                )}
                               </Card.Body>
                             </Card>
                           </Col>

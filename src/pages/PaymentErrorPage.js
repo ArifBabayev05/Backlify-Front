@@ -101,7 +101,7 @@ const PaymentErrorPage = () => {
 
   return (
     <RequireAuth>
-      <div className="min-vh-100 d-flex align-items-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+      <div className="page-wrapper d-flex align-items-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <Container>
           <motion.div
             variants={containerVariants}

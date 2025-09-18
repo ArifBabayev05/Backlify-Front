@@ -15,7 +15,7 @@ import NavBar from '../components/layout/NavBar';
 import PlanSelectionInterface from '../components/usage/PlanSelectionInterface';
 import UsageDashboard from '../components/usage/UsageDashboard';
 import LimitNotifications from '../components/usage/LimitNotifications';
-import { getSubscriptionPlans, getApiUsageStats, getUserApis, getUserCurrentPlan, getRealApiUsageFromLogs, setXAuthUserId } from '../utils/apiService';
+import { getSubscriptionPlans, getApiUsageStats, getUserApis, getUserCurrentPlan, getRealApiUsageFromLogs, setXAuthUserId, getUserDebugInfo } from '../utils/apiService';
 import { handleApiError } from '../utils/errorHandler';
 
 const UsageLimitsPage = () => {
@@ -24,19 +24,25 @@ const UsageLimitsPage = () => {
   const [activeTab, setActiveTab] = useState('plans');
   const [currentPlan, setCurrentPlan] = useState(null);
   const [userApis, setUserApis] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [userDebugInfo, setUserDebugInfo] = useState(null);
+  const [debugInfoLoading, setDebugInfoLoading] = useState(false);
+  const [plansData, setPlansData] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
 
   // Check if user is admin
   const isAdmin = user?.username === 'Admin';
 
   useEffect(() => {
     loadUserData();
+    loadUserDebugInfo();
+    loadPlansData();
   }, []);
 
   const loadUserData = async () => {
     try {
-      setLoading(true);
-      
       // Get username from localStorage
       const username = localStorage.getItem('username') || user?.username;
       
@@ -65,11 +71,45 @@ const UsageLimitsPage = () => {
         setUserApis([]);
       }
       
+      setInitialDataLoaded(true);
+      
     } catch (error) {
       console.error('Error loading user data:', error);
       handleApiError(error, 'UsageLimitsPage');
+      setInitialDataLoaded(true);
+    }
+  };
+
+  const loadUserDebugInfo = async () => {
+    try {
+      setDebugInfoLoading(true);
+      const username = localStorage.getItem('username') || user?.username;
+      const debugInfo = await getUserDebugInfo(username);
+      setUserDebugInfo(debugInfo);
+    } catch (error) {
+      console.error('Error loading user debug info:', error);
+      handleApiError(error, 'UsageLimitsPage');
     } finally {
-      setLoading(false);
+      setDebugInfoLoading(false);
+    }
+  };
+
+  const loadPlansData = async () => {
+    try {
+      setPlansLoading(true);
+      const response = await fetch('https://backlify-v2.onrender.com/api/user/plans');
+      const data = await response.json();
+      
+      if (data.success) {
+        setPlansData(data.data);
+      } else {
+        throw new Error('Failed to load plans data');
+      }
+    } catch (error) {
+      console.error('Error loading plans data:', error);
+      handleApiError(error, 'UsageLimitsPage');
+    } finally {
+      setPlansLoading(false);
     }
   };
 
@@ -87,6 +127,27 @@ const UsageLimitsPage = () => {
 
   const handleUpgradeClick = () => {
     navigate('/payment/upgrade');
+  };
+
+  const handleTabChange = (tabKey) => {
+    setActiveTab(tabKey);
+    if (tabKey === 'usage' && initialDataLoaded) {
+      loadUsageData();
+    }
+  };
+
+  const loadUsageData = async () => {
+    try {
+      setUsageLoading(true);
+      // Load usage data only when needed
+      const usageData = await getRealApiUsageFromLogs();
+      // Handle usage data if needed
+    } catch (error) {
+      console.error('Error loading usage data:', error);
+      handleApiError(error, 'UsageLimitsPage');
+    } finally {
+      setUsageLoading(false);
+    }
   };
 
   const containerVariants = {
@@ -113,31 +174,12 @@ const UsageLimitsPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <RequireAuth>
-        <div className="min-vh-100 d-flex align-items-center justify-content-center" 
-             style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-center"
-          >
-            <div className="spinner-border text-primary mb-3" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <p className="text-light">Loading usage limits...</p>
-          </motion.div>
-        </div>
-      </RequireAuth>
-    );
-  }
+  // Remove the loading screen - show page immediately
 
   return (
     <RequireAuth>
-      <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <NavBar />
+      <div className="page-wrapper" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <LimitNotifications onUpgradeClick={handleUpgradeClick} />
         
         <Container className="py-5">
@@ -146,30 +188,37 @@ const UsageLimitsPage = () => {
             initial="hidden"
             animate="visible"
           >
-            {/* Header */}
-            <motion.div variants={itemVariants} className="mb-5">
-              <div className="d-flex justify-content-between align-items-center mb-4">
+            {/* Professional Header */}
+            <motion.div variants={itemVariants} className="mb-8">
+              <div className="d-flex justify-content-between align-items-center mb-6">
                 <div>
                   <Button 
-                    variant="outline-light" 
+                    variant="ghost" 
                     onClick={() => navigate('/dashboard')}
-                    className="mb-3"
+                    className="btn btn-ghost btn-sm mb-4 d-flex align-items-center gap-2"
                   >
-                    <ArrowLeft className="me-2" />
+                    <ArrowLeft size={16} />
                     Back to Dashboard
                   </Button>
-                  <h1 className="display-5 fw-bold text-white mb-2">
+                  <h1 className="heading-2 text-white mb-3">
                     Usage Limits & Plans
+                    {/* {!initialDataLoaded && (
+                      <span className="ms-3">
+                        <div className="spinner-border spinner-border-sm text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                      </span>
+                    )} */}
                   </h1>
-                  <p className="lead text-light">
+                  <p className="body-large text-light">
                     Manage your subscription plan and monitor API usage
                   </p>
                 </div>
                 {isAdmin && (
                   <Button 
-                    variant="outline-success"
+                    variant="secondary"
                     onClick={() => navigate('/admin/usage')}
-                    className="d-flex align-items-center gap-2"
+                    className="btn btn-secondary btn-sm d-flex align-items-center gap-2"
                   >
                     <BarChart size={16} />
                     Admin Panel
@@ -178,12 +227,12 @@ const UsageLimitsPage = () => {
               </div>
             </motion.div>
 
-            {/* Tabs */}
+            {/* Professional Tabs */}
             <motion.div variants={itemVariants}>
               <Tabs
                 activeKey={activeTab}
-                onSelect={(k) => setActiveTab(k)}
-                className="mb-4"
+                  onSelect={handleTabChange}
+                  className="mb-6"
                 style={{
                   '--bs-nav-tabs-border-color': 'rgba(255, 255, 255, 0.1)',
                   '--bs-nav-tabs-link-hover-border-color': 'rgba(59, 130, 246, 0.3)',
@@ -197,7 +246,7 @@ const UsageLimitsPage = () => {
                   title={
                     <span className="d-flex align-items-center gap-2">
                       <CreditCard2Front size={16} />
-                      Subscription Plans
+                      <span className="body-base fw-medium">Subscription Plans</span>
                     </span>
                   }
                 >
@@ -205,13 +254,153 @@ const UsageLimitsPage = () => {
                     variants={itemVariants}
                     initial="hidden"
                     animate="visible"
+                    className="mt-6"
                   >
-                    <PlanSelectionInterface
-                      currentPlan={currentPlan}
-                      onPlanSelect={handlePlanSelect}
-                      onUpgrade={handleUpgrade}
-                      showUsageInfo={true}
-                    />
+                    {!initialDataLoaded || debugInfoLoading || plansLoading ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border text-primary mb-3" role="status">
+                          <span className="visually-hidden">Loading plan data...</span>
+                        </div>
+                        <p className="text-light">Loading your current plan...</p>
+                      </div>
+                    ) : (
+                      <div className="row justify-content-center mt-3">
+                        <div className="col-lg-8 mb-3">
+                          {/* Current Plan Card */}
+                          <div className="current-plan-card mb-4">
+                            <div className="plan-header">
+                              <div className="plan-icon-wrapper">
+                                <div className="plan-icon">
+                                  <CreditCard2Front size={24} />
+                                </div>
+                                {/* <div className="current-badge">Current Plan</div> */}
+                              </div>
+                              <h2 className="plan-title">
+                                {(() => {
+                                  const currentPlanId = userDebugInfo?.user_plan || 'basic';
+                                  const plan = plansData.find(p => p.id === currentPlanId);
+                                  return plan?.name || 'Basic Plan';
+                                })()}
+                              </h2>
+                              <p className="plan-description">
+                                {(() => {
+                                  const currentPlanId = userDebugInfo?.user_plan || 'basic';
+                                  const descriptions = {
+                                    basic: 'Perfect for getting started',
+                                    pro: 'Best for growing businesses',
+                                    enterprise: 'For large-scale operations'
+                                  };
+                                  return descriptions[currentPlanId] || 'Perfect for getting started';
+                                })()}
+                              </p>
+                            </div>
+                            
+                            <div className="plan-content">
+                              <div className="row">
+                                {/* What's Included Section */}
+                                <div className="col-md-6">
+                                  <h4 className="section-title">
+                                    <CreditCard2Front size={18} />
+                                    What's Included
+                                  </h4>
+                                  <div className="features-list">
+                                    {(() => {
+                                      const currentPlanId = userDebugInfo?.user_plan || 'basic';
+                                      const plan = plansData.find(p => p.id === currentPlanId);
+                                      return plan?.features?.map((feature, index) => (
+                                        <div key={index} className="feature-item">
+                                          <div className="check-icon">
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                              <path d="M10 3L4.5 8.5L2 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                          </div>
+                                          <span className="feature-text">{feature}</span>
+                                        </div>
+                                      )) || [];
+                                    })()}
+                                  </div>
+                                </div>
+                                
+                                {/* Usage Limits Section */}
+                                <div className="col-md-6">
+                                  <h4 className="section-title">
+                                    <BarChart size={18} />
+                                    Usage Limits
+                                  </h4>
+                                  <div className="limits-list">
+                                  <div className="limit-item">
+                                    <span className="limit-label">API Requests</span>
+                                    <span className="limit-value">
+                                      {userDebugInfo?.limits?.requests === -1
+                                        ? 'Unlimited'
+                                        : `${userDebugInfo?.limits?.requests || '1000'}/month`}
+                                    </span>
+                                  </div>
+                                      
+                                  <div className="limit-item">
+                                    <span className="limit-label">Projects</span>
+                                    <span className="limit-value">
+                                      {userDebugInfo?.limits?.projects === -1
+                                        ? 'Unlimited'
+                                        : userDebugInfo?.limits?.projects || 'Unlimited'}
+                                    </span>
+                                  </div>
+
+                                    <div className="limit-item">
+                                      <span className="limit-label">Support</span>
+                                      <span className="limit-value support">
+                                        {(() => {
+                                          const currentPlanId = userDebugInfo?.user_plan || 'basic';
+                                          return currentPlanId === 'basic' ? 'Email' :
+                                                 currentPlanId === 'pro' ? 'Priority' :
+                                                 currentPlanId === 'enterprise' ? '24/7' : 'Email';
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="plan-actions">
+                                <button 
+                                  className="btn-primary-action"
+                                  onClick={() => navigate('/payment/upgrade')}
+                                >
+                                  <CreditCard2Front size={18} />
+                                  See Other Plans
+                                </button>
+                                <button 
+                                  className="btn-secondary-action"
+                                  onClick={() => navigate('/dashboard')}
+                                >
+                                  Back to Dashboard
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Plan Comparison Hint */}
+                          <div className="upgrade-hint-card">
+                            <div className="hint-icon">
+                              <CreditCard2Front size={24} />
+                            </div>
+                            <h4 className="hint-title">Need More Power?</h4>
+                            <p className="hint-description">
+                              Compare all available plans and find the perfect fit for your needs. 
+                              Upgrade anytime with no long-term commitments.
+                            </p>
+                            <button 
+                              className="btn-outline-action"
+                              onClick={() => navigate('/payment/upgrade')}
+                            >
+                              <CreditCard2Front size={18} />
+                              View All Plans
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 </Tab>
 
@@ -220,7 +409,7 @@ const UsageLimitsPage = () => {
                   title={
                     <span className="d-flex align-items-center gap-2">
                       <BarChart size={16} />
-                      Usage Dashboard
+                      <span className="body-base fw-medium">Usage Dashboard</span>
                     </span>
                   }
                 >
@@ -228,9 +417,31 @@ const UsageLimitsPage = () => {
                     variants={itemVariants}
                     initial="hidden"
                     animate="visible"
+                    className="mt-6"
                   >
-                    {userApis.length > 0 ? (
-                      <div>
+                    {!initialDataLoaded ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border text-primary mb-3" role="status">
+                          <span className="visually-hidden">Loading initial data...</span>
+                        </div>
+                        <p className="text-light">Loading initial data...</p>
+                      </div>
+                    ) : usageLoading ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border text-primary mb-3" role="status">
+                          <span className="visually-hidden">Loading usage data...</span>
+                        </div>
+                        <p className="text-light">Loading usage statistics...</p>
+                        <div className="progress mt-3" style={{ height: '4px', width: '300px', margin: '0 auto' }}>
+                          <div 
+                            className="progress-bar progress-bar-striped progress-bar-animated" 
+                            role="progressbar" 
+                            style={{ width: '100%' }}
+                          ></div>
+                        </div>
+                      </div>
+                    ) : userApis.length > 0 ? (
+                      <div className='mt-3'>
                         {/* Combined Usage Overview */}
                         <Card className="border-0 glass mb-4">
                           <Card.Header className="bg-transparent border-0">
@@ -255,7 +466,7 @@ const UsageLimitsPage = () => {
                         </Card>
 
                         {/* Individual API Details */}
-                        <Card className="border-0 glass">
+                        {/* <Card className="border-0 glass">
                           <Card.Header className="bg-transparent border-0">
                             <h5 className="text-white mb-0">
                               <BarChart className="me-2" />
@@ -317,7 +528,7 @@ const UsageLimitsPage = () => {
                               ))}
                             </Row>
                           </Card.Body>
-                        </Card>
+                        </Card> */}
                       </div>
                     ) : (
                       <Alert variant="info" className="text-center">
@@ -340,7 +551,7 @@ const UsageLimitsPage = () => {
                   title={
                     <span className="d-flex align-items-center gap-2">
                       <Bell size={16} />
-                      Notifications
+                      <span className="body-base fw-medium">Notifications</span>
                     </span>
                   }
                 >
@@ -348,8 +559,9 @@ const UsageLimitsPage = () => {
                     variants={itemVariants}
                     initial="hidden"
                     animate="visible"
+                    className="mt-6"
                   >
-                    <Card className="border-0 glass">
+                    <Card className="border-0 glass mt-3">
                       <Card.Header className="bg-transparent border-0">
                         <h5 className="text-white mb-0">
                           <Bell className="me-2" />

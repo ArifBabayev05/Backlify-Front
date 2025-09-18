@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Alert, Pagination, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Spinner, Alert, Pagination, Badge, Modal } from 'react-bootstrap';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthContext';
-import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine, FaSyncAlt } from 'react-icons/fa';
+import { FaPlus, FaServer, FaCalendarAlt, FaTable, FaChevronLeft, FaChevronRight, FaHome, FaFilter, FaSearch, FaChartLine, FaSyncAlt, FaTrash, FaExclamationTriangle } from 'react-icons/fa';
 import { apiRequest } from '../utils/apiService';
 import GlobalSpinner from '../components/common/GlobalSpinner';
 import SpinnerLoading from '../components/common/SpinnerLoading';
 import useCacheControl from '../utils/useCacheControl';
+import { toast } from 'react-hot-toast';
 const fadeIn = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.4 } }
@@ -36,6 +37,11 @@ const DashboardPage = () => {
   const [error, setError] = useState(null);
   const [isCached, setIsCached] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [apiToDelete, setApiToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   
   // Get cache control functions from our custom hook
   const { invalidateCache, forceRefresh } = useCacheControl();
@@ -150,6 +156,51 @@ const DashboardPage = () => {
   const handleRefresh = () => {
     // Force refresh by skipping cache
     fetchUserApis(true);
+  };
+
+  const handleDeleteClick = (api, event) => {
+    event.stopPropagation(); // Prevent card click
+    setApiToDelete(api);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!apiToDelete) return;
+    
+    setDeleting(true);
+    try {
+      const response = await apiRequest(`/api/${apiToDelete.apiId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        toast.success('API deleted successfully');
+        // Remove the API from the local state
+        setApis(prevApis => prevApis.filter(api => api.apiId !== apiToDelete.apiId));
+        // Update total pages
+        setTotalPages(Math.ceil((apis.length - 1) / apisPerPage));
+        // Reset to first page if current page is empty
+        if (currentPage > Math.ceil((apis.length - 1) / apisPerPage)) {
+          setCurrentPage(1);
+        }
+        // Invalidate cache
+        invalidateCache('/my-apis');
+      } else {
+        throw new Error(response.message || 'Failed to delete API');
+      }
+    } catch (error) {
+      console.error('Error deleting API:', error);
+      toast.error(`Failed to delete API: ${error.message}`);
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+      setApiToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setApiToDelete(null);
   };
 
   const handleApiSelect = (apiId) => {
@@ -280,102 +331,90 @@ const DashboardPage = () => {
   };
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={fadeIn}
-      className="min-vh-100 d-flex flex-column"
-      style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        color: 'white',
-        paddingTop: '2rem',
-        paddingBottom: '3rem',
-        overflowY: 'auto',
-        height: '100vh'
-      }}
-    >
-      {/* Navigation Bar */}
-      <div className="position-fixed top-0 start-0 w-100 py-3 px-4" style={{ 
-        backdropFilter: 'blur(10px)',
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        zIndex: 1000
-      }}>
+    <>
+      {/* Professional Navigation Bar */}
+      <div className="navbar">
         <Container>
-          <div className="d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center">
-              <div className="d-flex align-items-center justify-content-center rounded-circle me-2" 
-                style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  background: 'rgba(59, 130, 246, 0.2)',
-                }}>
-                <FaServer className="text-primary" size={20} />
-              </div>
-              <h5 className="m-0 text-white d-none d-md-block">Backlify Dashboard</h5>
+          <div className="d-flex align-items-center gap-3">
+            <div className="d-flex align-items-center justify-content-center rounded-2 p-2" 
+              style={{ 
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                border: '1px solid rgba(59, 130, 246, 0.2)'
+              }}>
+              <FaServer className="text-primary" size={20} />
             </div>
-            <div className="d-flex gap-2">
-              {isAdmin && (
-                <Button
-                  variant="outline-success"
-                  className="d-flex align-items-center gap-2"
-                  onClick={navigateToLogs}
-                  style={{
-                    borderColor: 'rgba(16, 185, 129, 0.4)',
-                    borderRadius: '8px',
-                    padding: '0.5rem 1rem'
-                  }}
-                >
-                  <FaChartLine size={14} /> <span className="d-none d-md-inline">Logs Dashboard</span>
-                </Button>
-              )}
+            <h5 className="heading-5 text-white mb-0 d-none d-md-block">Backlify Dashboard</h5>
+          </div>
+          
+          <div className="d-flex gap-3 align-items-center">
+            {isAdmin && (
               <Button
-                variant="outline-info"
-                className="d-flex align-items-center gap-2"
-                onClick={() => navigate('/usage')}
-                style={{
-                  borderColor: 'rgba(59, 130, 246, 0.4)',
-                  borderRadius: '8px',
-                  padding: '0.5rem 1rem'
-                }}
+                variant="secondary"
+                size="sm"
+                className="btn btn-secondary btn-sm d-flex align-items-center gap-2"
+                onClick={navigateToLogs}
               >
-                <FaChartLine size={14} /> <span className="d-none d-md-inline">Usage & Plans</span>
+                <FaChartLine size={14} /> 
+                <span className="d-none d-md-inline">Logs Dashboard</span>
               </Button>
-              <Button
-                variant="outline-light"
-                className="d-flex align-items-center gap-2"
-                onClick={navigateToHome}
-                style={{
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.5rem 1rem'
-                }}
-              >
-                <FaHome size={14} /> <span className="d-none d-md-inline">Return to Home</span>
-              </Button>
-            </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="btn btn-outline btn-sm d-flex align-items-center gap-2"
+              onClick={() => navigate('/usage')}
+            >
+              <FaChartLine size={14} /> 
+              <span className="d-none d-md-inline">Usage & Plans</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="btn btn-ghost btn-sm d-flex align-items-center gap-2"
+              onClick={navigateToHome}
+            >
+              <FaHome size={14} /> 
+              <span className="d-none d-md-inline">Home</span>
+            </Button>
           </div>
         </Container>
       </div>
 
-      <Container className="pb-5 mt-5 pt-4">
+      <div className="page-wrapper" style={{
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        color: 'white',
+        minHeight: '100vh'
+      }}>
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+          className="min-vh-100 d-flex flex-column"
+        >
+        <Container className="pb-5">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-5"
+          className="text-center mb-8"
         >
-          <h1 className="display-5 fw-bold mb-2" style={{ 
-            background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            letterSpacing: '-1px'
-          }}>
-            My API Dashboard
-          </h1>
-          <p className="lead text-light opacity-75 mx-auto" style={{ maxWidth: '600px' }}>
-            Manage and access your API endpoints with ease
-          </p>
+          <div className="d-flex align-items-center justify-content-center mb-6">
+            <div className="me-4 p-4 rounded-3" style={{
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              boxShadow: '0 8px 32px rgba(59, 130, 246, 0.1)'
+            }}>
+              <FaServer size={32} className="text-primary" />
+            </div>
+            <div className="text-start">
+              <h1 className="heading-2 text-gradient mb-3">
+                My API Dashboard
+              </h1>
+              <p className="body-large text-light mb-0" style={{ maxWidth: '500px' }}>
+                Manage and access your API endpoints with ease
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {error && (
@@ -455,32 +494,37 @@ const DashboardPage = () => {
           </motion.div>
         ) : (
           <>
-            {/* Add refresh button and cache indicator */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <div>
+            {/* Professional Status Bar */}
+            <div className="d-flex justify-content-between align-items-center mb-6">
+              <div className="d-flex align-items-center gap-4">
                 {isCached && (
-                  <Badge bg="info" className="me-2 py-2 px-3" style={{ borderRadius: '8px' }}>
-                    <small>Using cached data</small>
-                  </Badge>
+                  <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style={{ 
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    color: '#60a5fa'
+                  }}>
+                    <div className="p-1 rounded-1" style={{ background: 'rgba(59, 130, 246, 0.2)' }}>
+                      <FaSyncAlt size={12} />
+                    </div>
+                    <span className="caption text-primary">Using cached data</span>
+                  </div>
                 )}
                 {lastRefreshTime && (
-                  <span className="text-white-50 small">
-                    Last updated: {lastRefreshTime.toLocaleTimeString()}
-                  </span>
+                  <div className="text-light">
+                    <span className="caption text-white d-block">Last updated</span>
+                    <span className="body-small text-white fw-medium">{lastRefreshTime.toLocaleTimeString()}</span>
+                  </div>
                 )}
               </div>
+              
               <Button 
-                variant="outline-primary" 
+                variant="outline" 
                 size="sm" 
                 onClick={handleRefresh}
-                className="d-flex align-items-center gap-2"
-                style={{
-                  borderRadius: '8px',
-                  padding: '0.5rem 1rem',
-                  borderColor: 'rgba(59, 130, 246, 0.4)'
-                }}
+                className="btn btn-outline btn-sm d-flex align-items-center gap-2"
+                disabled={loading}
               >
-                <FaSyncAlt size={14} />
+                <FaSyncAlt size={14} className={loading ? 'spinning' : ''} />
                 <span>Refresh</span>
               </Button>
             </div>
@@ -494,77 +538,102 @@ const DashboardPage = () => {
                   <Col key={api.apiId} lg={4} md={6} className="mb-4">
                     <motion.div variants={itemVariant}>
                       <Card 
-                        className="h-100 border-0 shadow-lg overflow-hidden"
-                        style={{ 
-                          background: 'rgba(30, 41, 59, 0.7)',
-                          backdropFilter: 'blur(10px)',
-                          borderRadius: '16px',
-                          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                          cursor: 'pointer'
-                        }}
+                        className="card h-100"
                         onClick={() => handleApiSelect(api.apiId)}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-8px)';
-                          e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)';
-                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         <div 
                           className="position-absolute top-0 start-0 w-100" 
                           style={{ 
-                            height: '6px', 
+                            height: '4px', 
                             background: getRandomGradient(index),
                             zIndex: 1
                           }}
                         />
-                        <Card.Body className="d-flex flex-column position-relative p-4">
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <div className="d-flex align-items-center">
+                        <Card.Body className="card-body">
+                          <div className="d-flex justify-content-between align-items-start mb-4">
+                            <div className="d-flex align-items-center gap-3">
                               <div 
-                                className="d-flex align-items-center justify-content-center rounded-circle me-2" 
+                                className="d-flex align-items-center justify-content-center rounded-2 p-2" 
                                 style={{ 
-                                  width: '36px', 
-                                  height: '36px', 
-                                  background: 'rgba(59, 130, 246, 0.1)',
-                                  flexShrink: 0
+                                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                                  border: '1px solid rgba(59, 130, 246, 0.2)'
                                 }}
                               >
-                                <FaServer className="text-primary" />
+                                <FaServer className="text-primary" size={20} />
                               </div>
-                              <Card.Title className="mb-0 text-primary fw-bold" style={{ fontSize: '1.25rem' }}>
-                                {api.apiId.substring(0, 8)}
-                              </Card.Title>
+                              <div>
+                                <h6 className="heading-6 text-white mb-1">
+                                  {api.apiId.substring(0, 8)}
+                                </h6>
+                                <span className="caption text-white">API Endpoint</span>
+                              </div>
                             </div>
-                            {isRecent(api.createdAt) && (
-                              <span 
-                                className="badge px-2 py-1 text-white" 
-                                style={{ 
-                                  fontSize: '0.7rem',
-                                  background: 'linear-gradient(90deg, #10b981, #059669)',
-                                  borderRadius: '6px'
+                            <div className="d-flex align-items-center gap-2">
+                              {isRecent(api.createdAt) && (
+                                <span 
+                                  className="px-2 py-1 rounded-1 text-white caption" 
+                                  style={{ 
+                                    background: 'linear-gradient(90deg, #10b981, #059669)',
+                                  }}
+                                >
+                                  New
+                                </span>
+                              )}
+                              <Button
+                                variant="outline-danger"
+                                size="sm"
+                                className="btn btn-outline-danger btn-sm d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: '0',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onClick={(e) => handleDeleteClick(api, e)}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
                                 }}
                               >
-                                New
-                              </span>
-                            )}
+                                <FaTrash size={12} className="text-danger" />
+                              </Button>
+                            </div>
                           </div>
 
-                          <Card.Text className="text-light d-flex align-items-start mb-4">
-                            <FaTable className="text-light opacity-50 me-2 mt-1" style={{ flexShrink: 0 }} />
-                            <span>
-                              <strong className="d-block mb-1 text-white-50">Tables:</strong> 
-                              <span className="text-white">{api.tables.join(', ')}</span>
-                            </span>
-                          </Card.Text>
+                          <div className="mb-4">
+                            <div className="d-flex align-items-start gap-3">
+                              <div className="p-1 rounded-1" style={{ background: 'rgba(139, 92, 246, 0.2)' }}>
+                                <FaTable className="text-primary" size={14} />
+                              </div>
+                              <div>
+                                <span className="caption text-white d-block mb-1">Tables</span>
+                                <span className="body-small text-white">
+                                  {api.tables.join(', ')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
 
-                          <div className="mt-auto pt-3 border-top border-dark d-flex align-items-center">
-                            <FaCalendarAlt className="text-light opacity-50 me-2" size={12} />
-                            <small className="text-light opacity-75">
-                              Created: {formatDate(api.createdAt)}
-                            </small>
+                          <div className="d-flex align-items-center justify-content-between pt-3" style={{ 
+                            borderTop: '1px solid rgba(255, 255, 255, 0.1)' 
+                          }}>
+                            <div className="d-flex align-items-center gap-2">
+                              <FaCalendarAlt className="text-white" size={12} />
+                              <span className="caption text-white">
+                                {formatDate(api.createdAt)}
+                              </span>
+                            </div>
+                            <span className="caption text-primary">
+                              View Details →
+                            </span>
                           </div>
                         </Card.Body>
                       </Card>
@@ -603,8 +672,136 @@ const DashboardPage = () => {
             )}
           </>
         )}
-      </Container>
-    </motion.div>
+        </Container>
+        </motion.div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal 
+        show={showDeleteModal} 
+        onHide={handleDeleteCancel}
+        centered
+        backdrop="static"
+        keyboard={false}
+      >
+        <Modal.Header 
+          closeButton 
+          className="bg-dark border-secondary"
+          style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
+        >
+          <Modal.Title className="text-white d-flex align-items-center gap-2">
+            <FaExclamationTriangle className="text-warning" />
+            Delete API
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body 
+          className="bg-dark"
+          style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}
+        >
+          <div className="text-center py-3">
+            <div className="mb-4">
+              <div className="d-inline-flex align-items-center justify-content-center rounded-circle p-3 mb-3" 
+                style={{ 
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  width: '64px',
+                  height: '64px'
+                }}>
+                <FaTrash className="text-danger" size={24} />
+              </div>
+              <h5 className="text-white mb-3">Are you sure you want to delete this API?</h5>
+            </div>
+            
+            {apiToDelete && (
+              <div className="mb-4 p-3 rounded-2" 
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                <div className="text-start">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <FaServer className="text-primary" size={16} />
+                    <span className="text-white fw-medium">API ID:</span>
+                    <span className="text-light">{apiToDelete.apiId.substring(0, 8)}...</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <FaTable className="text-primary" size={14} />
+                    <span className="text-white fw-medium">Tables:</span>
+                    <span className="text-light">{apiToDelete.tables.join(', ')}</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <FaCalendarAlt className="text-primary" size={14} />
+                    <span className="text-white fw-medium">Created:</span>
+                    <span className="text-light">{formatDate(apiToDelete.createdAt)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="alert alert-warning border-0 mb-4" 
+              style={{ 
+                background: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                color: '#fbbf24'
+              }}>
+              <div className="d-flex align-items-start gap-3">
+                <FaExclamationTriangle size={16} className="mt-1" />
+                <div className="text-start">
+                  <h6 className="mb-2 text-warning">Important Information</h6>
+                  <ul className="mb-0 small text-start">
+                    <li>This action will soft delete your API (data is preserved)</li>
+                    <li>Your API will be removed from the active list</li>
+                    <li>API cannot be automatically restored from the dashboard</li>
+                    <li>To restore, you must contact support with your API ID</li>
+                    <li>This action cannot be undone without support assistance</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-light small">
+              <strong>API ID for support:</strong> {apiToDelete?.apiId}
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer 
+          className="bg-dark border-secondary"
+          style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}
+        >
+          <Button 
+            variant="secondary" 
+            onClick={handleDeleteCancel}
+            disabled={deleting}
+            className="d-flex align-items-center gap-2"
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={handleDeleteConfirm}
+            disabled={deleting}
+            className="d-flex align-items-center gap-2"
+            style={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              border: 'none',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            {deleting ? (
+              <>
+                <Spinner size="sm" animation="border" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <FaTrash size={14} />
+                Delete API
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </>
   );
 };
 

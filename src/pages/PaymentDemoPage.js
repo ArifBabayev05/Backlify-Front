@@ -278,7 +278,7 @@ const PaymentDemoPage = () => {
                     <Card.Body className="p-4 text-center">
                       <Spinner animation="border" variant="primary" className="mb-3" />
                       <h5 className="text-white">Preparing your payment...</h5>
-                      <p className="text-muted">Please wait while we set up your payment details.</p>
+                      <p className="text-white">Please wait while we set up your payment details.</p>
                     </Card.Body>
                   </Card>
                 ) : orderData ? (
@@ -292,7 +292,7 @@ const PaymentDemoPage = () => {
                   <Card className="glass border-0">
                     <Card.Body className="p-4 text-center">
                       <h5 className="text-white">Payment Information Not Available</h5>
-                      <p className="text-muted">Please go back and select a plan to continue.</p>
+                      <p className="text-white">Please go back and select a plan to continue.</p>
                       <Button 
                         variant="primary" 
                         onClick={handleBackToPlans}
@@ -379,9 +379,8 @@ const PaymentDemoPage = () => {
 
   return (
     <RequireAuth>
-      <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-        <NavBar />
-        
+      <NavBar />
+      <div className="page-wrapper" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <Container className="py-5">
           <motion.div
             variants={containerVariants}
@@ -434,17 +433,7 @@ const PaymentDemoPage = () => {
               </div>
             </motion.div>
 
-            {/* Debug Button - Remove in production */}
-            <motion.div variants={itemVariants} className="mb-3 text-center">
-              <Button 
-                variant="outline-warning" 
-                size="sm" 
-                onClick={debugAuth}
-                className="mb-2"
-              >
-                🔍 Debug Authentication
-              </Button>
-            </motion.div>
+
 
             {/* Security and Trust Information */}
             <motion.div variants={itemVariants} className="mb-5">

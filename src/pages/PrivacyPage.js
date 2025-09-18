@@ -236,7 +236,7 @@ const PrivacyPage = () => {
                   }}>
                     <div className="mb-3">
                       <strong className="text-white me-2">Email:</strong>
-                      <span className="text-light">backlifyai@gmail.com</span>
+                      <span className="text-light">info@backlify.app</span>
                     </div>
                     <div>
                       <strong className="text-white me-2">Phone Number:</strong>

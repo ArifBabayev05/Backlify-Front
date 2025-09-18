@@ -880,7 +880,7 @@ const EndpointsPage = () => {
     } else {
       // When going back to schema, set a flag to reload schema data if needed
       sessionStorage.setItem('reload_schema', 'true');
-      navigate('/schema');
+      navigate('/dashboard');
     }
   };
 

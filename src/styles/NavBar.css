@@ -1,0 +1,53 @@
+.navbar {
+  padding: 1rem 0;
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.nav-link {
+  color: #f8fafc !important;
+  margin: 0 1rem;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #3b82f6 !important;
+}
+
+/* Content padding to prevent navbar overlap */
+.page-container {
+  padding-top: 5rem;
+  min-height: 100vh;
+}
+
+/* Logo styles */
+.navbar-logo {
+  height: 40px;
+  width: auto;
+  margin-right: 0.5rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 991px) {
+  .navbar-collapse {
+    background: rgba(15, 23, 42, 0.95);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .nav-link {
+    margin: 0.5rem 0;
+  }
+}

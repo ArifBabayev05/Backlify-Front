@@ -1,0 +1,68 @@
+.landing-container {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  padding-top: 4rem;
+}
+
+.hero-section {
+  position: relative;
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  background: radial-gradient(circle at center, rgba(59, 130, 246, 0.1), transparent 70%);
+}
+
+.hero-content {
+  z-index: 1;
+  max-width: 800px;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: bold;
+  background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 1.5rem;
+}
+
+.hero-description {
+  font-size: 1.2rem;
+  color: #94a3b8;
+  margin-bottom: 2rem;
+}
+
+.hero-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 600px;
+  opacity: 0.1;
+  z-index: 0;
+}
+
+.prompt-section {
+  padding: 4rem 0;
+}
+
+.prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* Particles effect */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.3);
+  pointer-events: none;
+}

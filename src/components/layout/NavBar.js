@@ -3,6 +3,7 @@ import { Navbar, Nav, Container, Button, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../auth/AuthContext';
+import '../../styles/NavBar.css';
 
 const NavBar = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -18,11 +19,7 @@ const NavBar = () => {
     <Navbar 
       expand="lg" 
       expanded={expanded}
-      className="py-3 position-absolute w-100"
-      style={{ 
-        background: 'transparent',
-        zIndex: 1000,
-      }}
+      className="navbar"
       variant="dark"
     >
       <Container>
@@ -68,7 +65,7 @@ const NavBar = () => {
                 </Nav.Link>
                
                 
-                <Dropdown align="end">
+                <Dropdown align="end" className="d-flex">
                   <Dropdown.Toggle 
                     variant="link" 
                     id="dropdown-user" 

@@ -24,7 +24,7 @@ const PaymentForm = ({
         <Card.Body className="p-4 text-center">
           <div className="text-white">
             <h5>Loading payment information...</h5>
-            <p className="text-muted">Please wait while we prepare your payment details.</p>
+            <p className="text-white">Please wait while we prepare your payment details.</p>
           </div>
         </Card.Body>
       </Card>

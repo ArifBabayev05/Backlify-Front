@@ -10,7 +10,7 @@ import {
   InfoCircle
 } from 'react-bootstrap-icons';
 import { toast } from 'react-hot-toast';
-import subscriptionService from '../../utils/subscriptionService';
+import { getSubscriptionPlans } from '../../utils/apiService';
 
 const SubscriptionPlans = ({ 
   currentPlan = null,
@@ -27,7 +27,7 @@ const SubscriptionPlans = ({
     const loadPlans = async () => {
       try {
         setPlansLoading(true);
-        const apiPlans = await subscriptionService.getSubscriptionPlans();
+        const apiPlans = await getSubscriptionPlans();
         
         // Transform API data to match component structure
         const transformedPlans = apiPlans.map(plan => ({
@@ -154,7 +154,7 @@ const SubscriptionPlans = ({
           <p className="text-white mt-3">Loading subscription plans...</p>
         </div>
       ) : (
-        <Row className="g-4">
+        <Row className="g-4" style={{ marginTop: '20px' }}>
           {plans.map((plan, index) => {
           const status = getPlanStatus(plan);
           const isCurrentPlan = currentPlan?.id === plan.id;
@@ -167,71 +167,95 @@ const SubscriptionPlans = ({
                 className="h-100"
               >
                 <Card 
-                  className={`h-100 border-0 position-relative ${
+                  className={`h-100 border-0 position-relative subscription-card ${
                     plan.popular ? 'popular-plan' : 'glass'
                   }`}
                   style={{
                     background: plan.popular 
-                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)'
+                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)'
                       : 'rgba(255, 255, 255, 0.05)',
-                    border: plan.popular ? '2px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    border: plan.popular ? '2px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
                     cursor: 'pointer',
                     transform: selectedPlan?.id === plan.id ? 'scale(1.02)' : 'scale(1)',
-                    transition: 'transform 0.2s ease'
+                    transition: 'all 0.3s ease',
+                    boxShadow: plan.popular 
+                      ? '0 10px 30px rgba(59, 130, 246, 0.2)' 
+                      : '0 4px 15px rgba(0, 0, 0, 0.1)',
+                    overflow: 'visible'
                   }}
                   onClick={() => handlePlanSelect(plan)}
                 >
+                  {/* Most Popular Badge - positioned at the top */}
                   {plan.popular && (
-                    <div className="position-absolute top-0 start-50 translate-middle">
+                    <div 
+                      className="position-absolute"
+                      style={{
+                        top: '-15px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 1000
+                      }}
+                    >
                       <Badge 
                         bg="primary" 
-                        className="px-3 py-2 rounded-pill"
-                        style={{ fontSize: '0.8rem' }}
+                        className="px-4 py-2 rounded-pill shadow plan-badge"
+                        style={{ 
+                          fontSize: '0.85rem',
+                          fontWeight: '600',
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                          border: '2px solid rgba(255, 255, 255, 0.2)',
+                          boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+                        }}
                       >
+                        <Star size={14} className="me-1" />
                         Most Popular
                       </Badge>
                     </div>
                   )}
 
-                  <Card.Body className="p-4 text-center">
+                  <Card.Body className="p-4 text-center" style={{ paddingTop: plan.popular ? '2rem' : '1.5rem' }}>
                     <div className="mb-4">
                       <div 
-                        className={`d-inline-flex align-items-center justify-content-center rounded-circle mb-3 ${
+                        className={`d-inline-flex align-items-center justify-content-center rounded-circle mb-4 plan-icon ${
                           plan.color === 'primary' ? 'text-primary' :
                           plan.color === 'warning' ? 'text-warning' : 'text-secondary'
                         }`}
                         style={{ 
-                          width: '60px', 
-                          height: '60px',
+                          width: '70px', 
+                          height: '70px',
                           background: `rgba(${
                             plan.color === 'primary' ? '59, 130, 246' :
                             plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
-                          }, 0.1)`
+                          }, 0.15)`,
+                          border: `2px solid rgba(${
+                            plan.color === 'primary' ? '59, 130, 246' :
+                            plan.color === 'warning' ? '255, 193, 7' : '108, 117, 125'
+                          }, 0.3)`
                         }}
                       >
                         {plan.icon}
                       </div>
                       
-                      <h4 className="text-white mb-2">{plan.name}</h4>
-                      <p className="text-white mb-3">{plan.description}</p>
+                      <h4 className="text-white mb-2 fw-bold">{plan.name}</h4>
+                      <p className="text-light mb-4" style={{ fontSize: '0.95rem' }}>{plan.description}</p>
                       
                       <div className="mb-4">
-                        <div className="display-6 fw-bold text-white">
+                        <div className="display-6 fw-bold text-white mb-1" >
                           {formatPrice(plan.price, plan.currency, plan.period)}
                         </div>
                         {plan.period !== 'forever' && (
-                          <small className="text-white">billed monthly</small>
+                          <small className="text-light">billed monthly</small>
                         )}
                       </div>
                     </div>
 
                     <div className="mb-4">
-                      <h6 className="text-white mb-3">Features included:</h6>
-                      <ul className="list-unstyled">
+                      <h6 className="text-white mb-3 fw-semibold">Features included:</h6>
+                      <ul className="list-unstyled feature-list">
                         {plan.features.map((feature, featureIndex) => (
                           <li key={featureIndex} className="text-light mb-2 d-flex align-items-start">
-                            <CheckCircle className="text-success me-2 mt-1" size={16} />
-                            <span>{feature}</span>
+                            <CheckCircle className="text-success me-2 mt-1 flex-shrink-0" size={16} />
+                            <span style={{ fontSize: '0.9rem' }}>{feature}</span>
                           </li>
                         ))}
                       </ul>
@@ -239,11 +263,12 @@ const SubscriptionPlans = ({
 
                     {plan.limitations.length > 0 && (
                       <div className="mb-4">
-                        <h6 className="text-white mb-3">Limitations:</h6>
+                        <h6 className="text-white mb-3 fw-semibold">Limitations:</h6>
                         <ul className="list-unstyled">
                           {plan.limitations.map((limitation, limitationIndex) => (
-                            <li key={limitationIndex} className="text-white mb-1 small">
-                              • {limitation}
+                            <li key={limitationIndex} className="text-light mb-1 small d-flex align-items-start">
+                              <span className="text-muted me-2">•</span>
+                              <span>{limitation}</span>
                             </li>
                           ))}
                         </ul>
@@ -255,36 +280,56 @@ const SubscriptionPlans = ({
                         <Button
                           variant="success"
                           size="lg"
-                          className="w-100"
+                          className="w-100 py-3 fw-semibold"
                           disabled
+                          style={{
+                            borderRadius: '12px',
+                            fontSize: '1rem'
+                          }}
                         >
-                          <CheckCircle className="me-2" />
+                          <CheckCircle className="me-2" size={18} />
                           Current Plan
                         </Button>
                       ) : isUpgrade ? (
                         <Button
                           variant="primary"
                           size="lg"
-                          className="w-100"
+                          className="w-100 py-3 fw-semibold plan-button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleUpgrade(plan);
                           }}
                           disabled={loading}
+                          style={{
+                            borderRadius: '12px',
+                            fontSize: '1rem',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                            border: 'none',
+                            boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                          }}
                         >
-                          <ArrowRight className="me-2" />
+                          <ArrowRight className="me-2" size={18} />
                           Upgrade to {plan.name}
                         </Button>
                       ) : (
                         <Button
-                          variant={status.variant}
+                          variant={status.variant === 'primary' ? 'primary' : 'outline-light'}
                           size="lg"
-                          className="w-100"
+                          className="w-100 py-3 fw-semibold plan-button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePlanSelect(plan);
                           }}
                           disabled={loading}
+                          style={{
+                            borderRadius: '12px',
+                            fontSize: '1rem',
+                            ...(status.variant === 'primary' ? {
+                              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                              border: 'none',
+                              boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                            } : {})
+                          }}
                         >
                           {status.text}
                         </Button>
@@ -307,11 +352,9 @@ const SubscriptionPlans = ({
             <div>
               <h6 className="mb-2">Plan Information</h6>
               <ul className="mb-0 small">
-                <li>All plans include a 14-day free trial</li>
                 <li>You can upgrade or downgrade at any time</li>
                 <li>No setup fees or hidden charges</li>
                 <li>Cancel anytime with no penalties</li>
-                <li>Enterprise plans include custom pricing and features</li>
               </ul>
             </div>
           </div>

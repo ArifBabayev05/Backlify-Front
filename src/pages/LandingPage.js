@@ -117,7 +117,8 @@ const LandingPage = () => {
 
   return (
     <div 
-      className="min-vh-100 d-flex flex-column align-items-center justify-content-center p-4 position-relative overflow-hidden"
+      className="min-vh-100 d-flex flex-column align-items-center justify-content-center p-4 position-relative overflow-hidden page-wrapper"
+      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}
     >
       {/* Animated particles background */}
       <div className="position-absolute w-100 h-100" style={{ top: 0, left: 0, zIndex: 1, overflow: 'hidden' }}>
@@ -259,10 +260,10 @@ const LandingPage = () => {
                     src={dbIcon} 
                     alt="Database Schema Builder Icon - Build APIs visually" 
                     className="mb-3" 
-                    style={{ height: '60px', width: 'auto' }} 
+                    style={{ height: '40px', width: 'auto' }} 
                     loading="lazy"
-                    width="60"
-                    height="60"
+                    width="40"
+                    height="40"
                   />
                 </motion.div>
               </div>
@@ -332,3 +333,4 @@ const LandingPage = () => {
 };
 
 export default LandingPage; 
+

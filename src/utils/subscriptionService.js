@@ -17,7 +17,22 @@ class SubscriptionService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/payment/plans`);
+      // Get username from localStorage
+      const username = localStorage.getItem('username');
+      
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add username header if available
+      if (username) {
+        headers['x-user-id'] = username;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/user/plans`, {
+        method: 'GET',
+        headers: headers
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

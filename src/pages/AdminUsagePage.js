@@ -33,9 +33,8 @@ const AdminUsagePage = () => {
 
   return (
     <RequireAuth>
-      <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-        <NavBar />
-        
+      <NavBar />
+      <div className="page-wrapper" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <Container className="py-5">
           <motion.div
             initial={{ opacity: 0, y: -20 }}

@@ -140,7 +140,7 @@ const PaymentSuccessPage = () => {
   if (loading) {
     return (
       <RequireAuth>
-        <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+        <div className="page-wrapper d-flex align-items-center justify-content-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
           <div className="text-center">
             <Spinner animation="border" variant="primary" size="lg" />
             <p className="text-white mt-3">Loading your subscription details...</p>
@@ -152,7 +152,7 @@ const PaymentSuccessPage = () => {
 
   return (
     <RequireAuth>
-      <div className="min-vh-100 d-flex align-items-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+      <div className="page-wrapper d-flex align-items-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <Container>
           <motion.div
             variants={containerVariants}
