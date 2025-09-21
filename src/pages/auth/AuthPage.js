@@ -66,24 +66,42 @@ const ThreeAnimation = React.memo(() => {
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         currentMount.appendChild(renderer.domElement);
 
-        const primaryColor = 0x6366f1;
-        const secondaryColor = 0x8b5cf6;
+        const primaryColor = 0x00D2FF;
+        const secondaryColor = 0x3A7BD5;
         const geometry = new IcosahedronGeometry(1.5, 1);
-        const material = new MeshStandardMaterial({ color: primaryColor, roughness: 0.2, metalness: 0.7, wireframe: true });
+        const material = new MeshStandardMaterial({ 
+            color: primaryColor, 
+            roughness: 0.1, 
+            metalness: 0.3, 
+            wireframe: true,
+            emissive: 0x001122,
+            emissiveIntensity: 0.3
+        });
         const crystal = new Mesh(geometry, material);
         scene.add(crystal);
 
         const torusGeometry = new TorusGeometry(2.5, 0.05, 16, 100);
-        const torusMaterial = new MeshStandardMaterial({ color: secondaryColor, roughness: 0.1, metalness: 0.9 });
+        const torusMaterial = new MeshStandardMaterial({ 
+            color: secondaryColor, 
+            roughness: 0.05, 
+            metalness: 0.8,
+            emissive: 0x001133,
+            emissiveIntensity: 0.2
+        });
         const torus = new Mesh(torusGeometry, torusMaterial);
         torus.rotation.x = Math.PI / 2;
         scene.add(torus);
 
-        const ambientLight = new AmbientLight(0xffffff, 0.3);
+        const ambientLight = new AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
-        const directionalLight = new DirectionalLight(0xffffff, 1);
+        const directionalLight = new DirectionalLight(0xffffff, 1.2);
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
+        
+        // Add additional blue-tinted light for more vibrant colors
+        const blueLight = new DirectionalLight(0x00D2FF, 0.3);
+        blueLight.position.set(-3, 2, 3);
+        scene.add(blueLight);
 
         const handleMouseMove = (event) => {
             if (!currentMount) return;
@@ -319,20 +337,52 @@ const AuthPage = () => {
 
     const pageStyles = useMemo(() => `
         :root {
-            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            --dark-bg: #030712;
+            --primary-gradient: linear-gradient(135deg, #00D2FF 0%, #3A7BD5 50%, #8B5CF6 100%);
+            --dark-bg: #0B0D17;
             --card-bg: rgba(31, 41, 55, 0.3);
-            --text-primary: #f9fafb;
+            --text-primary: #E2E8F0;
             --text-secondary: #9ca3af;
-            --border-color: rgba(255, 255, 255, 0.2);
+            --border-color: rgba(0, 210, 255, 0.2);
         }
         .auth-container { min-height: 100vh; background-color: var(--dark-bg); display: grid; grid-template-columns: 1fr; color: var(--text-primary); }
         @media (min-width: 992px) { .auth-container { grid-template-columns: 1fr 1fr; } }
         
-        .auth-left-panel { display: none; position: relative; background: linear-gradient(180deg, rgba(3, 7, 18, 0.9), rgba(3, 7, 18, 1)); padding: 3rem; text-align: center; flex-direction: column; justify-content: center; align-items: center; }
+        .auth-left-panel { display: none; position: relative; background: linear-gradient(135deg, #0F172A 0%, rgb(20, 27, 39) 50%, rgb(15, 21, 29) 100%); padding: 3rem; text-align: center; flex-direction: column; justify-content: center; align-items: center; }
         @media (min-width: 992px) { .auth-left-panel { display: flex; } }
         
-        .auth-left-panel .brand-logo { font-size: 2rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; position: absolute; top: 2rem; left: 2rem; text-decoration: none; }
+        .auth-left-panel .brand-logo { 
+            font-size: 2.2rem; 
+            font-weight: 900; 
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #00D2FF 0%, #3A7BD5 50%, #8B5CF6 100%);
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            background-clip: text; 
+            position: absolute; 
+            top: 2rem; 
+            left: 2rem; 
+            text-decoration: none; 
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.3s ease;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
+        }
+        .auth-left-panel .brand-logo:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+        }
+        .brand-logo-icon {
+            width: 36px;
+            height: 36px;
+            filter: brightness(0) invert(1);
+            transition: all 0.3s ease;
+        }
+        .auth-left-panel .brand-logo:hover .brand-logo-icon {
+            transform: scale(1.1);
+            filter: brightness(0) invert(1) drop-shadow(0 0 10px rgba(0, 210, 255, 0.5));
+        }
         .auth-left-panel h2 { font-weight: 700; margin-bottom: 1rem; }
         .auth-left-panel p { color: var(--text-secondary); max-width: 400px; }
         .animation-container { width: 100%; height: 50vh; position: relative; }
@@ -344,7 +394,7 @@ const AuthPage = () => {
         .auth-tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 2rem; }
         .auth-tab { flex: 1; text-align: center; padding: 1rem; color: var(--text-secondary); font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s ease; text-decoration: none; }
         .auth-tab:hover { color: var(--text-primary); }
-        .auth-tab.active { color: var(--text-primary); border-bottom-color: #6366f1; }
+        .auth-tab.active { color: var(--text-primary); border-bottom-color: #00D2FF; }
 
         .form-label-custom { color: var(--text-secondary); font-size: 0.9rem; text-align: left; padding-left: 0; }
         @media (min-width: 576px) { .form-label-custom { text-align: right; padding-right: 1rem; } }
@@ -373,12 +423,12 @@ const AuthPage = () => {
             border-radius: 0.75rem;
             font-weight: 600;
             transition: all 0.4s ease-in-out;
-            box-shadow: 0 8px 15px rgba(99, 102, 241, 0.25);
+            box-shadow: 0 8px 15px rgba(0, 210, 255, 0.25);
         }
         .btn-gradient:hover {
             background-position: right center;
             transform: translateY(-2px);
-            box-shadow: 0 12px 20px rgba(99, 102, 241, 0.4);
+            box-shadow: 0 12px 20px rgba(0, 210, 255, 0.4);
         }
         
         .btn-google {
@@ -436,7 +486,12 @@ const AuthPage = () => {
             <div className="auth-container">
                 <div className="auth-left-panel">
                     <Link to="/" className="brand-logo z-3">
-                        <i className="fa-solid fa-bolt me-2 z-3"></i>Backlify
+                        <img 
+                            src="/backlify.png" 
+                            alt="Backlify Logo" 
+                            className="brand-logo-icon"
+                        />
+                        Backlify AI
                     </Link>
                     <div className="animation-container">
                         <ThreeAnimation />
@@ -551,7 +606,7 @@ const AuthPage = () => {
                                                     <Link 
                                                         to="/privacy" 
                                                         className="text-decoration-none" 
-                                                        style={{ color: '#6366f1' }}
+                                                        style={{ color: '#00D2FF' }}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                     >

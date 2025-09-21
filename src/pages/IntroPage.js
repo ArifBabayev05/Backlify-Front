@@ -1,60 +1,239 @@
-import React, { useState,useEffect, useRef  } from "react";
-import { Navbar, Nav, Container, Button, Row, Col, Card, Modal, Accordion, Form  } from "react-bootstrap";
-import "bootstrap/dist/css/bootstrap.min.css";
-import { toast } from 'react-hot-toast'; // Bildirişlər üçün
+import React, { useState, useEffect, useRef } from 'react';
+import { Navbar, Nav, Container, Button, Row, Col, Card, Modal } from 'react-bootstrap';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { toast } from 'react-hot-toast';
 import backlifyIcon from '../assets/icons/backlify.png';
 import subscriptionService from '../utils/subscriptionService';
-import IntroThemeSwitch from '../components/common/IntroThemeSwitch';
 
-// Using Bootstrap Icons and Unicode symbols instead of Font Awesome
+// Mock data for AI API platform
+const mockFeatures = [
+  {
+    title: 'AI Schema Generation',
+    description: 'Transform natural language into optimized database schemas instantly. Our AI understands relationships, constraints, and best practices.',
+    image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop&crop=entropy',
+    icon: '⚡',
+    stats: '10x faster development'
+  },
+  {
+    title: 'No-Code Visual API Builder',
+    description: 'Design complex API workflows with drag-and-drop simplicity. Connect databases, external services, and business logic without writing code.',
+    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop&crop=entropy',
+    icon: '🔧',
+    stats: '500+ integrations'
+  },
+  {
+    title: 'Enterprise-Grade Security',
+    description: 'Built-in authentication, rate limiting, and monitoring. Deploy to cloud or on-premises with automatic scaling and 99.9% uptime guarantee.',
+    image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&h=300&fit=crop&crop=entropy',
+    icon: '🛡️',
+    stats: '99.9% uptime SLA'
+  },
+  {
+    title: 'Real-Time Analytics',
+    description: 'Track API performance, usage patterns, and errors in real-time. Get actionable insights to optimize your APIs and improve user experience.',
+    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop&crop=entropy',
+    icon: '📊',
+    stats: 'Real-time insights'
+  },
+];
+
+const mockPricingPlans = [
+  {
+    id: 'starter',
+    name: 'Developer',
+    price: 0,
+    description: 'Perfect for learning and prototyping',
+    features: ['3 API endpoints', '10K requests/month', 'Community support', 'Basic templates', 'Development environment'],
+    buttonText: 'Start Free'
+  },
+  {
+    id: 'pro',
+    name: 'Professional',
+    price: 49,
+    description: 'For growing businesses and teams',
+    features: ['Unlimited API endpoints', '1M requests/month', 'Priority support', 'Advanced integrations', 'Team collaboration', 'Custom domains', 'Analytics dashboard'],
+    isPopular: true,
+    buttonText: 'Start Trial'
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 'Custom',
+    description: 'For large organizations',
+    features: ['Unlimited everything', 'Dedicated infrastructure', 'Custom SLA', 'On-premise deployment', 'SSO integration', '24/7 phone support', 'Custom training'],
+    buttonText: 'Contact Sales'
+  },
+];
+
+const steps = [
+  {
+    number: '01',
+    title: 'Describe Your Idea',
+    description: 'Simply describe what you want to build in natural language. Our AI understands complex requirements and relationships.',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=300&h=200&fit=crop&crop=entropy',
+    mockup: 'Chat interface: "Create an e-commerce API with users, products, and orders"'
+  },
+  {
+    number: '02',
+    title: 'AI Generates Your Backend',
+    description: 'Backlify\'s AI analyzes your text and instantly creates database tables, relationships, and API endpoints with full documentation.',
+    image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=300&h=200&fit=crop&crop=entropy',
+    mockup: 'Code generation interface showing auto-generated endpoints'
+  },
+  {
+    number: '03',
+    title: 'Deploy and Integrate',
+    description: 'Your API is live instantly! Connect it to your frontend application and launch your project in record time.',
+    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=300&h=200&fit=crop&crop=entropy',
+    mockup: 'Dashboard showing API metrics and deployment status'
+  }
+];
+
+const testimonials = [
+  {
+    name: 'Sarah Chen',
+    role: 'CTO at TechFlow',
+    company: 'TechFlow',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=60&h=60&fit=crop&crop=faces',
+    quote: 'Backlify reduced our API development time from weeks to hours. The AI understands exactly what we need.'
+  },
+  {
+    name: 'Marcus Rodriguez',
+    role: 'Lead Developer at DataSync',
+    company: 'DataSync',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&fit=crop&crop=faces',
+    quote: 'The no-code visual builder is incredible. I can prototype APIs faster than ever before.'
+  },
+  {
+    name: 'Emily Watson',
+    role: 'Product Manager at CloudBase',
+    company: 'CloudBase',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&h=60&fit=crop&crop=faces',
+    quote: 'Enterprise security out of the box. Backlify handles compliance so we can focus on innovation.'
+  }
+];
 
 const IntroPage = () => {
-  // State management for the mobile warning modal
-  const [showMobileWarning, setShowMobileWarning] = useState(false);
-  const [animationStage, setAnimationStage] = useState(0);
-  const timeoutIds = useRef([]); // Animasiya timeout'larını saxlamaq üçün ref
-  const [loopKey, setLoopKey] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
+  const [isVisible, setIsVisible] = useState({});
   const [contactForm, setContactForm] = useState({ email: '', message: '' });
   const [isSending, setIsSending] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
-  // Animasiya mərhələlərini idarə etmək üçün useEffect
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const heroRef = useRef(null);
+  const featuresRef = useRef(null);
+  const stepsRef = useRef(null);
+  const pricingRef = useRef(null);
+  const featureItemRefs = useRef([]);
+  const lastActiveFeatureRef = useRef(0);
+
   useEffect(() => {
-    const runAnimationCycle = () => {
-        // Hər yeni döngünün başında "key"i artıraraq yazı animasiyasını təzələyirik
-        setLoopKey(prevKey => prevKey + 1);
-
-        timeoutIds.current.forEach(clearTimeout);
-        timeoutIds.current = [];
-
-        const sequence = [
-            { stage: 1, duration: 2000 },
-            { stage: 2, duration: 4000 },
-            { stage: 3, duration: 5000 },
-            { stage: 4, duration: 4000 },
-            { stage: null, duration: 1500 }
-        ];
-
-        let totalDelay = 2500;
-
-        sequence.forEach(item => {
-            const timeout = setTimeout(() => {
-                setAnimationStage(item.stage);
-            }, totalDelay);
-            timeoutIds.current.push(timeout);
-            totalDelay += item.duration;
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          setScrollY(window.scrollY);
+          setIsScrolled(window.scrollY > 50);
+          ticking = false;
         });
-        
-        const loopTimeout = setTimeout(runAnimationCycle, totalDelay);
-        timeoutIds.current.push(loopTimeout);
+      }
     };
-
-    runAnimationCycle();
-
+    
+    // Only add scroll listener on desktop
+    if (window.innerWidth >= 992) {
+      window.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    
     return () => {
-        timeoutIds.current.forEach(clearTimeout);
+      if (window.innerWidth >= 992) {
+        window.removeEventListener('scroll', handleScroll);
+      }
     };
-}, []);
+  }, []);
+
+  useEffect(() => {
+    // Only use intersection observer on desktop
+    if (window.innerWidth < 992) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.target === heroRef.current) {
+            setIsVisible(prev => ({ ...prev, hero: entry.isIntersecting }));
+          } else if (entry.target === featuresRef.current) {
+            setIsVisible(prev => ({ ...prev, features: entry.isIntersecting }));
+          } else if (entry.target === stepsRef.current) {
+            setIsVisible(prev => ({ ...prev, steps: entry.isIntersecting }));
+          } else if (entry.target === pricingRef.current) {
+            setIsVisible(prev => ({ ...prev, pricing: entry.isIntersecting }));
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (heroRef.current) observer.observe(heroRef.current);
+    if (featuresRef.current) observer.observe(featuresRef.current);
+    if (stepsRef.current) observer.observe(stepsRef.current);
+    if (pricingRef.current) observer.observe(pricingRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Scroll-progress based feature switching (desktop only)
+  useEffect(() => {
+    // Only run on desktop (lg and above)
+    const isDesktop = window.innerWidth >= 992;
+    if (!isDesktop) return;
+
+    let ticking = false;
+    
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          if (!featuresRef.current) {
+            ticking = false;
+            return;
+          }
+          
+          const sectionEl = featuresRef.current;
+          const rect = sectionEl.getBoundingClientRect();
+          const windowHeight = window.innerHeight;
+          const sectionHeight = sectionEl.offsetHeight;
+          
+          // Only compute when section is visible
+          const isInViewport = rect.bottom > 0 && rect.top < windowHeight;
+          
+          if (!isInViewport) {
+            ticking = false;
+            return;
+          }
+
+          const totalScrollable = Math.max(sectionHeight - windowHeight, 1);
+          const scrolled = Math.min(Math.max(-rect.top, 0), totalScrollable);
+          const progress = Math.min(Math.max(scrolled / totalScrollable, 0), 1);
+          const total = mockFeatures.length;
+          const index = Math.min(total - 1, Math.floor(progress * total));
+
+          if (index !== lastActiveFeatureRef.current && index >= 0 && index < total) {
+            lastActiveFeatureRef.current = index;
+            setActiveFeatureIndex(index);
+          }
+          
+          ticking = false;
+        });
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Load subscription plans
   useEffect(() => {
@@ -62,10 +241,10 @@ const IntroPage = () => {
       try {
         setPlansLoading(true);
         const plans = await subscriptionService.getSubscriptionPlans();
-        setSubscriptionPlans(plans);
+        setSubscriptionPlans(plans.length ? plans : mockPricingPlans);
       } catch (error) {
         console.error('Error loading subscription plans:', error);
-        toast.error('Failed to load pricing plans');
+        setSubscriptionPlans(mockPricingPlans);
       } finally {
         setPlansLoading(false);
       }
@@ -74,1544 +253,1826 @@ const IntroPage = () => {
     loadSubscriptionPlans();
   }, []);
 
-const handleContactChange = (e) => {
-  const { name, value } = e.target;
-  setContactForm(prev => ({ ...prev, [name]: value }));
-};
-  const handleCloseMobileWarning = () => setShowMobileWarning(false);
-  const handleShowMobileWarning = () => setShowMobileWarning(true);
-
-  // Handles the "Start for Free" button click
-  const handleStartClick = (e) => {
-    e.preventDefault();
-    // Checks if the screen width is mobile-sized
-    if (window.innerWidth < 768) {
-      handleShowMobileWarning();
-    } else {
-      // Redirects to the actual signup page on larger screens
-      window.location.href = "/register"; // Replace with your actual signup link
-    }
+  const handleContactChange = (e) => {
+    const { name, value } = e.target;
+    setContactForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- Mesaj göndərmə simulyasiyası ---
   const handleContactSubmit = (e) => {
     e.preventDefault();
     setIsSending(true);
-
-    // 2 saniyəlik yüklənmə simulyasiyası
     setTimeout(() => {
-        toast.success('Successful sending');
-        setContactForm({ email: '', message: '' }); // Formu təmizlə
-        setIsSending(false); // Yüklənməni dayandır
+      toast.success('Message sent successfully!');
+      setContactForm({ email: '', message: '' });
+      setIsSending(false);
     }, 2000);
   };
-  const css = `
-    :root {
-      --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-      --secondary-gradient: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
-      --accent-gradient: linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%);
-      --success-gradient: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-      --dark-bg: #030712;
-      --card-bg: rgba(31, 41, 55, 0.3);
-      --text-primary: #f9fafb;
-      --text-secondary: #9ca3af;
-      --text-white: #6b7280;
-      --border-color: rgba(255, 255, 255, 0.1);
-    }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+  const handleStartClick = (e) => {
+      e.preventDefault();
+    if (window.innerWidth < 768) {
+      setShowMobileWarning(true);
+    } else {
+      window.location.href = "/register";
     }
+  };
 
-    body {
-      background: var(--dark-bg);
-      color: var(--text-primary);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* Animations */
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-25px); }
-    }
-    @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
-      50% { box-shadow: 0 0 35px rgba(99, 102, 241, 0.7); }
-    }
-    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-25px); } }
-    @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); } 50% { box-shadow: 0 0 35px rgba(99, 102, 241, 0.7); } }
-    @keyframes slide-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-float { animation: float 6s ease-in-out infinite; }
-    .animate-pulse-glow { animation: pulse-glow 2.5s ease-in-out infinite; }
-    .animate-slide-up { animation: slide-up 0.8s ease-out forwards; animation-delay: 0.2s; opacity: 0; }
-    .gradient-text { background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .hero-section { min-height: 100vh; position: relative; display: flex; align-items: center; padding-top: 6rem; background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.1), transparent); }
-    .hero-title { font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800; line-height: 1.2; margin-bottom: 1.5rem; }
-    .hero-subtitle { font-size: clamp(1rem, 2.5vw, 1.25rem); color: var(--text-secondary); margin-bottom: 2.5rem; line-height: 1.7; max-width: 550px; }
-    /* STYLES FOR THE DYNAMIC VISUAL */
-    .dynamic-visual {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 24px;
-      padding: 2rem;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-    }
+  const plansToShow = subscriptionPlans.length ? subscriptionPlans : mockPricingPlans;
+  useEffect(() => {
+    const navbarToggler = document.querySelector('.navbar-toggler');
+    const navbarCollapse = document.querySelector('.navbar-collapse');
     
-        /* === Düzəliş Edilmiş Typing Animasiyası === */
-    .prompt-box {
-        background: rgba(0,0,0,0.3);
-        border-radius: 12px;
-        padding: 1.25rem;
-        font-family: 'Fira Code', monospace;
-        color: #c4b5fd;
-        width: 100%;
-        overflow-x: auto; /* Daşma zamanı scroll etməyə imkan verir */
-        scrollbar-width: none; /* Firefox üçün scrollbar'ı gizlədir */
-    }
-    .prompt-box::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera üçün scrollbar'ı gizlədir */
-    }
-    .typing-effect {
-        display: inline-block;
-        white-space: nowrap; /* Mətni bir sətirdə saxlayır */
-        border-right: .15em solid #c4b5fd;
-        vertical-align: middle;
-        width: 0;
-        animation: typing 3.5s steps(55) forwards, blink-caret .75s step-end infinite;
-    }
-    @keyframes typing {
-        from { width: 0; }
-        to { width: 55ch; } /* Konteynerin eninə deyil, mətnin uzunluğuna görə animasiya */
-    }
-    @keyframes blink-caret {
-        from, to { border-color: transparent }
-        50% { border-color: #c4b5fd; }
-    }
-   
-    
-    
-    .ai-processor {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 1.5rem 0;
-      gap: 1rem;
-    }
-    .ai-processor .line {
-      height: 1px;
-      flex-grow: 1;
-      background: linear-gradient(90deg, transparent, var(--border-color), transparent);
-    }
-    .ai-processor-icon {
-      font-size: 1.5rem;
-      color: var(--text-secondary);
-      animation: spin-glow 4s linear infinite;
-    }
-    @keyframes spin-glow {
-      0% { transform: rotate(0deg); text-shadow: 0 0 5px rgba(196, 181, 253, 0.5); }
-      50% { transform: rotate(180deg); text-shadow: 0 0 15px rgba(196, 181, 253, 1); }
-      100% { transform: rotate(360deg); text-shadow: 0 0 5px rgba(196, 181, 253, 0.5); }
-    }
-    
-    .code-output {
-      background: rgba(0, 0, 0, 0.5);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1.5rem;
-      font-family: 'Fira Code', 'Menlo', monospace;
-      font-size: 0.9rem;
-      color: #9ca3af;
-      position: relative;
-    }
-    .code-output::before {
-      content: '● ● ●';
-      position: absolute;
-      top: 10px; left: 15px;
-      color: #4b5563; font-size: 12px;
-    }
-    .code-output-content {
-      padding-top: 20px;
-    }
-
-    @keyframes fadeIn-line {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    /* === Contact Form Styles === */
-    .contact-form-container {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 1.5rem;
-        padding: 2.5rem;
-        backdrop-filter: blur(12px);
-    }
-    .form-control-contact {
-        background-color: rgba(15, 23, 42, 0.5) !important;
-        border: 1px solid var(--border-color) !important;
-        color: var(--text-primary) !important;
-        border-radius: 0.75rem !important;
-        padding: 0.9rem 1rem !important;
-        transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    }
-    .form-control-contact:focus {
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4) !important;
-        border-color: #6366f1 !important;
-        background-color: rgba(3, 7, 18, 0.7) !important;
-    }
-    .form-control-contact::placeholder { color: rgba(156, 163, 175, 0.5); }
-    .code-output-content span {
-      display: block;
-      opacity: 0; /* Start hidden */
-      animation: fadeIn-line 0.5s ease-out forwards;
-      white-space: pre; /* THE FIX: Prevents text from wrapping */
-      text-align: left;
-    }
-    /* Stagger the animation for each line */
-    .code-output-content span:nth-child(1) { animation-delay: 4.5s; }
-    .code-output-content span:nth-child(2) { animation-delay: 4.7s; }
-    .code-output-content span:nth-child(3) { animation-delay: 4.9s; }
-    .code-output-content span:nth-child(4) { animation-delay: 5.1s; }
-    .code-output-content span:nth-child(5) { animation-delay: 5.3s; }
-
-    .code-keyword { color: #c084fc; font-weight: 600; }
-    .code-path { color: #9ca3af; }
-    .code-variable { color: #60a5fa; }
-    .code-comment { color: #6b7280; font-style: italic; }
-    
-    /* Other general styles needed for the page */
-    p, li, h1, h2, h3, h4, h5, h6, blockquote { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
-    .navbar-custom { background: rgba(3, 7, 18, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color); padding: 1rem 0; }
-    .navbar-brand { font-size: 1.7rem; font-weight: 800; letter-spacing: -1px; }
-    .navbar-toggler { border: none; } .navbar-toggler:focus { box-shadow: none; }
-    .navbar-toggler i { color: var(--text-primary); font-size: 1.5rem; }
-    .nav-link { font-weight: 500; color: var(--text-secondary) !important; transition: color 0.3s ease; }
-    .nav-link:hover { color: var(--text-primary) !important; }
-    .btn-gradient { background: var(--primary-gradient); border: none; padding: 14px 32px; border-radius: 50px; font-weight: 600; color: white !important; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; transition: all 0.3s ease; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3), 0 1px 3px rgba(0,0,0,0.2); }
-    .btn-gradient:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(99, 102, 241, 0.4), 0 1px 3px rgba(0,0,0,0.2); }
-    .btn-outline-custom { border: 2px solid var(--border-color); padding: 14px 32px; border-radius: 50px; font-weight: 600; color: white !important; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; transition: all 0.3s ease; background: transparent; }
-    .btn-outline-custom:hover { background: var(--border-color); }
-        /* Ümumi stillər */
-    .navbar-custom { background: rgba(3, 7, 18, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color); }
-    .hero-section { min-height: 100vh; display: flex; align-items: center; padding-top: 6rem; background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.1), transparent); }
-    .hero-title { font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800; }
-    .hero-subtitle { font-size: clamp(1rem, 2.5vw, 1.25rem); color: var(--text-secondary); max-width: 550px; }
-    .gradient-text { background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .btn-gradient { background: var(--primary-gradient); border: none; padding: 14px 32px; border-radius: 50px; font-weight: 600; color: white !important; transition: all 0.3s ease; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3); }
-    .btn-gradient:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(99, 102, 241, 0.4); }
-    .btn-outline-custom { border: 2px solid var(--border-color); padding: 14px 32px; border-radius: 50px; font-weight: 600; color: white !important; transition: all 0.3s ease; }
-    .btn-outline-custom:hover { background: var(--border-color); }
-    
-    /* Animasiya üçün stillər */
-    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
-    .animate-float { animation: float 6s ease-in-out infinite; }
-    
-    .dynamic-visual-container {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 24px;
-      padding: 2rem;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-      min-height: 480px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 1.5rem; /* Prompt ilə animasiya arasında məsafə yaradır */
-      transition: all 0.5s ease-in-out;
-      overflow: hidden;
-      position: relative;
-    }
-    .animation-stages-wrapper {
-    width: 100%;
-    position: relative;
-    min-height: 350px; /* Bütün animasiyalar bu hündürlükdə baş verəcək */
-}
-    /* --- Typing effect düzəlişi --- */
-    .prompt-box {
-      background: rgba(0,0,0,0.3);
-      border-radius: 12px;
-      padding: 1.25rem;
-      font-family: 'Fira Code', monospace;
-      color: #c4b5fd;
-      width: 100%;
-    }
-    .typing-effect {
-      display: inline-block;
-      overflow: hidden;
-      white-space: nowrap;
-      border-right: .15em solid #c4b5fd;
-      vertical-align: middle;
-      width: 0;
-      animation: typing 2.5s steps(33) forwards, blink-caret .75s step-end infinite;
-    }
-    @keyframes typing {
-      from { width: 0; }
-      to { width: 55ch; } /* Cümlədəki simvol sayı qədər (character unit) */
-    }
-    @keyframes blink-caret {
-      from, to { border-color: transparent }
-      50% { border-color: #c4b5fd; }
-    }
-
-    .animation-stage {
-        width: 100%;
-        min-height: 300px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        position: absolute;
-        opacity: 0;
-        transform: scale(0.95) translateY(20px);
-        transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-        padding: 1rem;
-    }
-    .animation-stage.active {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-
-    /* Stage 1: Analyzing */
-    @keyframes spin-glow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    .ai-processor-icon { font-size: 3rem; color: #a5b4fc; animation: spin-glow 2s linear infinite; }
-    .analyzing-text { margin-top: 1rem; color: var(--text-secondary); font-family: 'Fira Code', monospace; }
-
-    /* --- Stage 2: Təkmilləşdirilmiş DB Schema --- */
-    .db-schema-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; position: relative; width: 100%; max-width: 500px; }
-    .db-table { background: #111827; border: 1px solid var(--border-color); border-top: 4px solid #6366f1; border-radius: 8px; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-    .db-schema-grid .db-table:nth-child(2) {
-    transform: translateY(75px); 
-}
-    .db-table-header { font-weight: bold; color: #a5b4fc; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
-    .db-column { color: var(--text-secondary); } .db-column span { color: #f59e0b; margin-right: 5px; }
-    .db-schema-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-    .relation-line { stroke: rgba(139, 92, 246, 0.7); stroke-width: 2; fill: none; stroke-dasharray: 200; stroke-dashoffset: 200; animation: draw-line 1s ease-out 0.5s forwards; }
-    @keyframes draw-line { to { stroke-dashoffset: 0; } }
-
-    /* Stage 3: API Generation */
-    .api-code-block { background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; font-family: 'Fira Code', monospace; font-size: 0.8rem; text-align: left; width: 100%; max-width: 450px; position: relative; }
-    .api-code-block::before { content: '● ● ●'; position: absolute; top: 10px; left: 15px; color: #4b5563; font-size: 12px; }
-    .api-code-content { padding-top: 20px; }
-    @keyframes fadeIn-line { from { opacity: 0; } to { opacity: 1; } }
-    .api-code-content > div { opacity: 0; animation: fadeIn-line 0.5s forwards; }
-    .code-keyword { color: #c084fc; font-weight: 600; } .code-path { color: #9ca3af; } .code-variable { color: #60a5fa; }
-    
-    /* --- Stage 4: Təkmilləşdirilmiş Integration --- */
-    .integration-container {
-    position: relative;
-    width: 250px;
-    height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.api-hub {
-    position: relative;
-    z-index: 2;
-    width: 70px;
-    height: 70px;
-    background: rgba(99, 102, 241, 0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #6366f1;
-}
-.api-hub i {
-    font-size: 1.8rem;
-    color: #a5b4fc;
-}
-.api-hub::before {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: #6366f1;
-    animation: pulse 2s infinite;
-}
-@keyframes pulse {
-    0% { transform: scale(0.9); opacity: 0.7; }
-    70% { transform: scale(1.5); opacity: 0; }
-    100% { transform: scale(0.9); opacity: 0; }
-}
-.frontend-icon-wrapper {
-    position: absolute;
-    z-index: 2;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #1e293b;
-    border: 1px solid var(--border-color);
-    border-radius: 50%;
-}
-.frontend-icon-wrapper.react {
-    top: 50%;
-    left: -20px; /* Konteynerdən bir qədər kənarda */
-    transform: translateY(-50%);
-}
-.frontend-icon-wrapper.vue {
-    top: 0px;
-    right: 20px;
-}
-.frontend-icon-wrapper.angular {
-    bottom: 0px;
-    right: 20px;
-}
-
-.frontend-icon {
-    font-size: 1.6rem;
-    opacity: 0;
-    animation: fadeIn-line 0.5s 0.5s forwards;
-}
-.frontend-icon.react { color: #61DAFB; }
-.frontend-icon.vue { color: #4FC08D; }
-.frontend-icon.angular { color: #DD0031; }
-
-.integration-svg {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    overflow: visible;
-    pointer-events: none;
-}
-.integration-svg path {
-    fill: none; /* Yolun içini boş saxlayır */
-    stroke: rgba(99, 102, 241, 0.3); /* Yola zəif rəng verir */
-    stroke-width: 1.5px;
-    stroke-dasharray: 4 4; /* Qırıq-qırıq xətt effekti */
-}
-.data-packet {
-    fill: #a5b4fc;
-    animation: move-packet 3s ease-in-out infinite;
-}
-.data-packet.p2 { animation-delay: 1s; }
-.data-packet.p3 { animation-delay: 2s; }
-
-@keyframes move-packet {
-    from { motion-offset: 0%; opacity: 1; }
-    to { motion-offset: 100%; opacity: 0; }
-}
-
-   
-    @keyframes draw-horiz-line { to { opacity: 1; transform: scaleX(1); } }
-    .frontend-icons { display: flex; flex-direction: column; gap: 1rem; }
-    .frontend-icon { font-size: 1.8rem; opacity: 0; transform: translateX(20px); animation: fade-in-right 0.5s forwards; }
-    .frontend-icon:nth-child(1) { animation-delay: 0.8s; color: #61DAFB; } /* React */
-    .frontend-icon:nth-child(2) { animation-delay: 1.0s; color: #4FC08D; } /* Vue */
-    .frontend-icon:nth-child(3) { animation-delay: 1.2s; color: #DD0031; } /* Angular */
-    @keyframes fade-in-right { to { opacity: 1; transform: translateX(0); } }
-    .section-padding { padding: 6rem 0; } .section-header { margin-bottom: 4rem; }
-    .section-title { 
-      font-size: clamp(2.2rem, 5vw, 3rem); 
-      font-weight: 800; 
-      margin-bottom: 1rem; 
-      text-align: center;
-    }
-    .section-subtitle { font-size: 1.15rem; color: var(--text-secondary); max-width: 700px; margin: 0 auto; }
-    .modal-content { background: #0f172a; border: 1px solid var(--border-color); border-radius: 16px; color: var(--text-primary); }
-    .modal-header { border-bottom: 1px solid var(--border-color); }
-    .modal-footer { border-top: 1px solid var(--border-color); }
-    .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
-    @media (max-width: 991px) { .navbar-collapse { background: rgba(3, 7, 18, 0.95); border-radius: 15px; margin-top: 1rem; padding: 1.5rem; border: 1px solid var(--border-color); } .navbar-nav { text-align: center; } .hero-section { text-align: center; } .hero-subtitle { margin: 0 auto 2.5rem; } .d-flex.gap-3 { justify-content: center; } }
-
-    /* Gradients & Backgrounds */
-    .bg-gradient-primary { background: var(--primary-gradient); }
-    .gradient-text {
-      background: var(--primary-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    p, li, h1, h2, h3, h4, h5, h6, blockquote {
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-    }
-
-    /* Navigation */
-    .navbar-custom {
-      background: rgba(3, 7, 18, 0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-color);
-      padding: 1rem 0;
-    }
-    
-    /* Fix navbar spacing issue on IntroPage */
-    .navbar.fixed-top {
-      background: rgba(3, 7, 18, 0.9) !important;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-color);
-      padding: 0.75rem 0;
-    }
-    .navbar-brand {
-      font-size: 1.7rem;
-      font-weight: 800;
-      letter-spacing: -1px;
-    }
-    .navbar-toggler { border: none; }
-    .navbar-toggler:focus { box-shadow: none; }
-    .navbar-toggler i { color: var(--text-primary); font-size: 1.5rem; }
-    .nav-link {
-        font-weight: 500;
-        color: var(--text-secondary) !important;
-        transition: color 0.3s ease;
-    }
-    .nav-link:hover { color: var(--text-primary) !important; }
-
-    /* Hero Section */
-    .hero-section {
-      min-height: 100vh;
-      position: relative;
-      display: flex;
-      align-items: center;
-      padding-top: 5rem;
-      background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.1), transparent);
-    }
-    
-    /* Fix page wrapper to eliminate black space */
-    .page-wrapper {
-      background: var(--dark-bg);
-      min-height: 100vh;
-      margin: 0;
-      padding: 0;
-    }
-    
-    /* Ensure no margin/padding issues */
-    body {
-      margin: 0;
-      padding: 0;
-      overflow-x: hidden;
-    }
-    
-    /* Fix navbar positioning */
-    .navbar.fixed-top {
-      z-index: 1030;
-      margin: 0;
-      padding: 0.75rem 0;
-    }
-    
-    /* Remove any default margins from sections */
-    .section {
-      margin: 0;
-      padding: 0;
-    }
-    .hero-title {
-      font-size: clamp(2.5rem, 6vw, 4rem);
-      font-weight: 800;
-      line-height: 1.2;
-      margin-bottom: 1.5rem;
-    }
-    .hero-subtitle {
-      font-size: clamp(1rem, 2.5vw, 1.25rem);
-      color: var(--text-secondary);
-      margin-bottom: 2.5rem;
-      line-height: 1.7;
-      max-width: 550px;
-    }
-
-    /* Buttons */
-    .btn-gradient {
-      background: var(--primary-gradient);
-      border: none;
-      padding: 14px 32px;
-      border-radius: 50px;
-      font-weight: 600;
-      color: white !important;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.3s ease;
-      box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3), 0 1px 3px rgba(0,0,0,0.2);
-    }
-    .btn-gradient:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 15px 35px rgba(99, 102, 241, 0.4), 0 1px 3px rgba(0,0,0,0.2);
-    }
-    .btn-outline-custom {
-      border: 2px solid var(--border-color);
-      padding: 14px 32px;
-      border-radius: 50px;
-      font-weight: 600;
-      color: white !important;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.3s ease;
-      background: transparent;
-    }
-    .btn-outline-custom:hover { background: var(--border-color); }
-
-    /* AI Prompt Visual */
-    .ai-prompt-visual {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 2rem;
-      backdrop-filter: blur(10px);
-    }
-    .prompt-input {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1rem;
-      font-family: 'Fira Code', 'Menlo', monospace;
-      font-size: 0.9rem;
-      color: #a5b4fc;
-    }
-    .prompt-arrow {
-      font-size: 2rem;
-      color: var(--text-white);
-      margin: 1.5rem 0;
-      transform: rotate(90deg);
-    }
-    @media (min-width: 992px) { .prompt-arrow { transform: rotate(0deg); } }
-    .code-output {
-      background: rgba(0, 0, 0, 0.5);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1.5rem;
-      font-family: 'Fira Code', 'Menlo', monospace;
-      font-size: 0.9rem;
-      color: #9ca3af;
-      position: relative;
-      overflow: hidden;
-      min-height: 150px;
-    }
-    .code-output::before {
-      content: '● ● ●';
-      position: absolute;
-      top: 10px;
-      left: 15px;
-      color: #4b5563;
-      font-size: 12px;
-    }
-    .code-output span { display: block; }
-    .code-keyword { color: #c084fc; }
-    .code-string { color: #a5b4fc; }
-    .code-variable { color: #60a5fa; }
-    .code-comment { color: #6b7280; }
-
-    /* Sections & Cards */
-    .section-padding { padding: 6rem 0; }
-    .section-header { margin-bottom: 4rem; }
-    .section-title {
-      font-size: clamp(2.2rem, 5vw, 3rem);
-      font-weight: 800;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-    .section-subtitle {
-      font-size: 1.15rem;
-      color: var(--text-secondary);
-      max-width: 700px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .feature-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 2rem;
-      height: 100%;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    .feature-card:hover {
-      transform: translateY(-10px);
-      border-color: rgba(99, 102, 241, 0.5);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    }
-    .feature-icon {
-      width: 60px;
-      height: 60px;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.7rem;
-      margin-bottom: 1.5rem;
-      color: white;
-    }
-    
-    /* How it works */
-    .step-card { text-align: center; }
-    .step-number {
-      font-size: 4rem;
-      font-weight: 800;
-      color: rgba(255, 255, 255, 0.1);
-      margin-bottom: -1.5rem;
-    }
-    .step-icon {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2rem;
-        margin-bottom: 1.5rem;
-        color: white;
-        border: 2px solid var(--border-color);
-    }
-    
-    /* Pricing */
-    .pricing-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 2.5rem;
-      height: 100%;
-      transition: all 0.3s ease;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    }
-    .pricing-card.popular {
-      border: 2px solid #6366f1;
-      transform: scale(1.05);
-      box-shadow: 0 20px 50px rgba(99, 102, 241, 0.2);
-    }
-    .pricing-card:hover { transform: translateY(-10px); }
-    .pricing-card.popular:hover { transform: scale(1.05) translateY(-10px); }
-    .popular-badge {
-      position: absolute;
-      top: -15px; left: 50%;
-      transform: translateX(-50%);
-      background: var(--primary-gradient);
-      color: white;
-      padding: 8px 20px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-    .price { font-size: 3.5rem; font-weight: 800; }
-    .pricing-card .list-unstyled { margin-bottom: 2rem; flex-grow: 1; }
-
-    /* Testimonials */
-    .testimonial-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 2rem;
-      height: 100%;
-    }
-    .avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
-    
-    /* Footer */
-    .footer {
-      background: #000;
-      border-top: 1px solid var(--border-color);
-      padding: 5rem 0 2rem 0;
-      margin-top: 6rem;
-    }
-    .footer-links { color: var(--text-secondary); text-decoration: none; transition: color 0.3s ease; }
-    .footer-links:hover { color: var(--text-primary); }
-    .social-icon {
-      width: 40px; height: 40px;
+    if (navbarToggler && navbarCollapse) {
+      const toggleNavbar = () => {
+        if (navbarCollapse.classList.contains('show')) {
+          navbarCollapse.classList.remove('show');
+          navbarCollapse.classList.add('collapsing');
+          setTimeout(() => {
+            navbarCollapse.classList.remove('collapsing');
+          }, 350);
+        } else {
+          navbarCollapse.classList.add('collapsing');
+          setTimeout(() => {
+            navbarCollapse.classList.remove('collapsing');
+            navbarCollapse.classList.add('show');
+          }, 10);
+        }
+      };
       
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-secondary);
-      text-decoration: none;
-      transition: all 0.3s ease;
-    }
-    .social-icon:hover {
+      navbarToggler.addEventListener('click', toggleNavbar);
       
-      color: white;
-      transform: translateY(-3px);
+      // Close menu when clicking on nav links (mobile)
+      const navLinks = document.querySelectorAll('.nav-link');
+      navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth < 992 && navbarCollapse.classList.contains('show')) {
+            toggleNavbar();
+          }
+        });
+      });
+      
+      // Close menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (window.innerWidth < 992 && 
+            navbarCollapse.classList.contains('show') &&
+            !navbarCollapse.contains(e.target) &&
+            !navbarToggler.contains(e.target)) {
+          toggleNavbar();
+        }
+      });
+      
+      return () => {
+        navbarToggler.removeEventListener('click', toggleNavbar);
+        navLinks.forEach(link => {
+          link.removeEventListener('click', toggleNavbar);
+        });
+      };
     }
-
-    /* Modal */
-    .modal-content {
-        background: #0f172a;
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        color: var(--text-primary);
-    }
-    .modal-header { border-bottom: 1px solid var(--border-color); }
-    .modal-footer { border-top: 1px solid var(--border-color); }
-    .btn-close {
-        filter: invert(1) grayscale(100%) brightness(200%);
-    }
-
-    /* About Us Section Styles */
-    .about-content {
-      padding-right: 2rem;
-    }
-    .stat-item {
-      text-align: center;
-    }
-    .stat-item h4 {
-      font-size: 2rem;
-      font-weight: 800;
-    }
-    .team-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.5rem;
-    }
-    .team-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      padding: 1.5rem;
-      text-align: center;
-      transition: all 0.3s ease;
-      backdrop-filter: blur(12px);
-    }
-    .team-card:hover {
-      transform: translateY(-5px);
-      border-color: rgba(99, 102, 241, 0.5);
-      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-    }
-    .team-avatar {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-    .mission-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 3rem;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-    }
-    .values-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-    .value-item {
-      text-align: center;
-      padding: 1.5rem;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      transition: all 0.3s ease;
-    }
-    .value-item:hover {
-      transform: translateY(-3px);
-      border-color: rgba(99, 102, 241, 0.3);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    }
-    .value-icon {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 991px) {
-      .navbar-collapse {
-        background: rgba(3, 7, 18, 0.95);
-        border-radius: 15px;
-        margin-top: 1rem;
-        padding: 1.5rem;
-        border: 1px solid var(--border-color);
-      }
-      .navbar-nav { text-align: center; }
-      .pricing-card.popular { transform: none; }
-      .hero-section { text-align: center; }
-      .hero-subtitle { margin-left: auto; margin-right: auto; }
-      .d-flex.gap-3 { justify-content: center; }
-      .about-content { padding-right: 0; margin-bottom: 3rem; }
-      .team-grid { grid-template-columns: 1fr; }
-      .values-grid { grid-template-columns: repeat(2, 1fr); }
-      .mission-card { padding: 2rem; }
-    }
-    @media (max-width: 576px) {
-      .values-grid { grid-template-columns: 1fr; }
-      .d-flex.gap-4 { flex-direction: column; gap: 1.5rem !important; }
-    }
-      .faq-accordion .accordion-item {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 1rem !important;
-    margin-bottom: 1rem;
-    overflow: hidden; /* For border-radius */
-}
-
-.faq-accordion .accordion-header .accordion-button {
-    background-color: transparent;
-    color: var(--text-primary);
-    font-weight: 600;
-    box-shadow: none;
-}
-
-.faq-accordion .accordion-header .accordion-button:not(.collapsed) {
-    background: var(--primary-gradient);
-    color: white;
-}
-
-.faq-accordion .accordion-header .accordion-button::after {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
-
-.faq-accordion .accordion-body {
-    color: var(--text-secondary);
-    background-color: rgba(0,0,0,0.2);
-}
-  `;
-
-  // --- renderAnimationStage funksiyasının yeni versiyası ---
-const renderAnimationStage = () => (
-  <>
-      {/* Stage 0 (Prompt) buradan çıxarıldı, çünki artıq sabitdir */}
-
-             <div className={`animation-stage ${animationStage === 1 ? 'active' : ''}`}>
-           <div className="ai-processor-icon">⚫</div>
-           <p className="analyzing-text">Analyzing Prompt...</p>
-       </div>
-
-      <div className={`animation-stage ${animationStage === 2 ? 'active' : ''}`}>
-          {/* ... Database Schema JSX kodu burada qalır ... */}
-                     <h5 className="mb-3 fw-bold">🗄️ Database Schema</h5>
-          <div className="db-schema-grid">
-               <div className="db-table">
-                  <div className="db-table-header">Users</div>
-                  <div className="db-column"><span>PK</span> id</div>
-                  <div className="db-column">username</div>
-              </div>
-              <div className="db-table">
-                  <div className="db-table-header">Posts</div>
-                  <div className="db-column"><span>PK</span> id</div>
-                  <div className="db-column"><span>FK</span> user_id</div>
-              </div>
-              <div className="db-table">
-                  <div className="db-table-header">Comments</div>
-                  <div className="db-column"><span>PK</span> id</div>
-                  <div className="db-column"><span>FK</span> post_id</div>
-              </div>
-              <svg className="db-schema-svg">
-                  <defs>
-                      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                          <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(139, 92, 246, 0.7)" />
-                      </marker>
-                  </defs>
-              </svg>
-          </div>
-      </div>
-
-      <div className={`animation-stage ${animationStage === 3 ? 'active' : ''}`}>
-          {/* ... Generated API JSX kodu burada qalır ... */}
-                     <h5 className="mb-3 fw-bold">📡 Generated API</h5>
-          <div className="api-code-block">
-            <div className="api-code-content">
-              <div style={{animationDelay: '0.3s'}}><span><span className="code-keyword">GET </span> <span className="code-path">/api/v1/users</span></span></div>
-              <div style={{animationDelay: '0.8s'}}><span><span className="code-keyword">POST</span> <span className="code-path">/api/v1/users</span></span></div>
-              <div style={{animationDelay: '1.3s'}}><span><span className="code-keyword">GET </span> <span className="code-path">/api/v1/posts</span></span></div>
-              <div style={{animationDelay: '1.8s'}}><span><span className="code-keyword">POST</span> <span className="code-path">/api/v1/posts</span></span></div>
-              <div style={{animationDelay: '2.3s'}}><span><span className="code-keyword">GET </span> <span className="code-path">/api/v1/posts/&#123;<span className="code-variable">id</span>&#125;/comments</span></span></div>
-            </div>
-          </div>
-      </div>
-
-      <div className={`animation-stage ${animationStage === 4 ? 'active' : ''}`}>
-           {/* ... Ready to Integrate JSX kodu burada qalır ... */}
-                     <h5 className="mb-4 fw-bold">🔗 Ready to Integrate</h5>
-          <div className="integration-container">
-                             <div className="api-hub">🖥️</div>
-                             <div className="frontend-icon-wrapper react"><span className="frontend-icon react">🟦</span></div>
-               <div className="frontend-icon-wrapper vue"><span className="frontend-icon vue">🟩</span></div>
-               <div className="frontend-icon-wrapper angular"><span className="frontend-icon angular">🟥</span></div>
-              <svg className="integration-svg">
-    {/* Mərkəzdən ikonlara gedən yeni yollar */}
-    <path id="path-react" d="M 125,100 C 80,100 40,100 0,100" />
-    <path id="path-vue"   d="M 125,100 C 150,50 200,30 230,20" />
-    <path id="path-angular" d="M 125,100 C 150,150 200,170 230,180" />
-    
-    {/* Data paketləri (bunlar dəyişmir) */}
-    <circle r="4" className="data-packet p1">
-        <animateMotion dur="3s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#path-react"/>
-        </animateMotion>
-    </circle>
-    <circle r="4" className="data-packet p2">
-        <animateMotion dur="3s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#path-vue"/>
-        </animateMotion>
-    </circle>
-    <circle r="4" className="data-packet p3">
-        <animateMotion dur="3s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#path-angular"/>
-        </animateMotion>
-    </circle>
-</svg>
-          </div>
-      </div>
-  </>
-);
-
+  }, []);
+  
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: css }} />
-      
-      {/* Special Theme Switch for Intro Page */}
-      <IntroThemeSwitch />
-      
-      {/* Professional Navigation */}
-      <Navbar expand="lg" className="navbar fixed-top" variant="dark">
-        <Container>
-          <Navbar.Brand href="#" className="navbar-brand">
-            <img 
-              src={backlifyIcon} 
-              alt="Backlify Logo" 
-              width="32" 
-              height="32"
-              style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(78%) saturate(2476%) hue-rotate(235deg) brightness(102%) contrast(97%)' }}
-            /> 
-            Backlify
-          </Navbar.Brand>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        body {
+          font-family: 'Outfit', sans-serif;
+          background: #0B0D17;
+          color: #E2E8F0;
+          overflow-x: hidden;
+        }
+
+        .font-mono {
+          font-family: 'JetBrains Mono', monospace;
+        }
+
+        .gradient-text {
+          background: linear-gradient(135deg, #00D2FF 0%, #3A7BD5 50%, #8B5CF6 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .gradient-text-alt {
+          background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .hero-bg {
+          background:
+            radial-gradient(circle at 30% 20%, rgba(0, 210, 255, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 70% 80%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(58, 123, 213, 0.08) 0%, transparent 50%);
+        }
+
+        .glass-card {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(20px);
+          border-radius: 20px;
+        }
+
+        .api-card {
+          background: linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+          border: 1px solid rgba(0, 210, 255, 0.2);
+          backdrop-filter: blur(20px);
+          border-radius: 16px;
+        }
+
+        .glow-effect {
+          box-shadow: 0 0 60px rgba(0, 210, 255, 0.15);
+        }
+
+        .popular-plan {
+          position: relative;
+          overflow: visible;
+        }
+
+        .popular-plan::before {
+          content: '';
+          position: absolute;
+          top: -2px;
+          left: -2px;
+          right: -2px;
+          bottom: -2px;
+          background: linear-gradient(45deg, #1e40af, #7c3aed, #1e40af);
+          border-radius: 16px;
+          z-index: -1;
+          animation: borderGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes borderGlow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+
+        .pricing-button {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .pricing-button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          transition: left 0.5s;
+        }
+
+        .pricing-button:hover::before {
+          left: 100%;
+        }
+
+        .glow-purple {
+          box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+        }
+
+        .animate-float {
+          animation: float 8s ease-in-out infinite;
+        }
+
+        .animate-fade-up {
+          opacity: 0;
+          transform: translateY(40px);
+          transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .animate-fade-up.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        .animate-slide-in {
+          opacity: 0;
+          transform: translateX(-40px);
+          transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .animate-slide-in.visible {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .animate-scale {
+          transform: scale(0.9);
+          opacity: 0;
+          transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .animate-scale.visible {
+          transform: scale(1);
+          opacity: 1;
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-30px); }
+        }
+
+        .particle {
+          position: absolute;
+          width: 3px;
+          height: 3px;
+          background: rgba(0, 210, 255, 0.4);
+          border-radius: 50%;
+          animation: particles 25s linear infinite;
+        }
+
+        @keyframes particles {
+          0% { transform: translateY(100vh) translateX(0px) rotate(0deg); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-100vh) translateX(150px) rotate(360deg); opacity: 0; }
+        }
+
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+
+        .bg-grid {
+          background-image: radial-gradient(circle at 2px 2px, rgba(0, 210, 255, 0.15) 2px, transparent 0);
+          background-size: 60px 60px;
+        }
+
+        .hover-lift:hover {
+          transform: translateY(-10px);
+          transition: transform 0.4s ease;
+        }
+
+        .nav-blur {
+          backdrop-filter: blur(30px);
+          background: rgba(11, 13, 23, 0.95);
+          transition: all 0.3s ease;
+          will-change: transform;
+        }
+
+        .nav-blur.scrolled {
+          background: rgba(11, 13, 23, 0.98);
+          box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+     
+
+       
+
+        .code-snippet {
+          background: rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(0, 210, 255, 0.3);
+          border-radius: 12px;
+          padding: 20px;
+          font-family: 'JetBrains Mono', monospace;
+        }
+
+        .api-endpoint {
+          background: linear-gradient(90deg, rgba(0, 210, 255, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+          border-left: 3px solid #00D2FF;
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin: 8px 0;
+        }
+
+        .metric-card {
+          background: linear-gradient(135deg, rgba(0, 210, 255, 0.08) 0%, rgba(58, 123, 213, 0.08) 100%);
+          border: 1px solid rgba(0, 210, 255, 0.2);
+          backdrop-filter: blur(10px);
+        }
+
+        .btn-primary {
+          background: linear-gradient(135deg, #00D2FF 0%, #3A7BD5 100%);
+          border: none;
+          transition: all 0.3s ease;
+          padding: 16px 32px;
+          border-radius: 12px;
+          font-weight: 600;
+          color: white;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
+        }
+
+        .btn-primary:hover {
+          background: linear-gradient(135deg, #00B8E6 0%, #3369BB 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(0, 210, 255, 0.3);
+          color: white;
+        }
+
+        .btn-outline {
+          background: transparent;
+          border: 2px solid rgba(255, 255, 255, 0.2);
+          color: #E2E8F0;
+          transition: all 0.3s ease;
+          padding: 14px 30px;
+          border-radius: 12px;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
+        }
+
+        .btn-outline:hover {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(0, 210, 255, 0.5);
+          color: #00D2FF;
+        }
+
+        /* Bootstrap Integration */
+        .section-padding { padding: 5rem 0; }
+        
+        .custom-container {
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+
+        /* Typography Responsive */
+        .hero-title {
+            font-size: clamp(1.5rem, 4vw, 3.5rem); /* mobil → kiçik, desktop → böyük */
+          line-height: 1.1;
+          text-align: center;
+          justify-content: center;
+          align-items: center;
+          display: grid;
+        }
+        .hero-title span {
+  font-size: clamp(2.2rem, 5vw, 2.5rem);
+            display: grid;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+}
+        .section-title {
+          font-size: clamp(2rem, 6vw, 3.5rem);
+          line-height: 1.2;
+        }
+        
+        .hero-subtitle {
+          font-size: clamp(1rem, 3vw, 1.5rem);
+          line-height: 1.6;
+        }
+
+        /* Mobile-First Responsive Design */
+        @media (max-width: 575.98px) {
+          .section-padding { padding: 2rem 0; }
+          .hero-bg { 
+            padding-top: 4rem !important; 
+            padding-bottom: 2rem !important; 
+            min-height: 100vh;
+          }
+          .display-1 { 
+            font-size: 2.2rem !important; 
+            line-height: 1.1;
+            margin-bottom: 1rem !important;
+          }
+          .display-4 { 
+            font-size: 1.6rem !important; 
+            line-height: 1.2;
+          }
+          .btn-lg { 
+            padding: 0.75rem 1.5rem; 
+            font-size: 0.9rem; 
+            width: 100%;
+            margin-bottom: 0.5rem;
+          }
+          .hero-title { 
+            font-size: 2rem !important; 
+            line-height: 1.15;
+            margin-bottom: 1.5rem !important;
+            letter-spacing: -0.02em;
+            word-spacing: -0.1em;
+          }
+          .section-title { 
+            font-size: 1.6rem !important; 
+            line-height: 1.25;
+            margin-bottom: 1rem !important;
+            letter-spacing: -0.01em;
+          }
+          .hero-subtitle {
+            font-size: 1rem !important;
+            line-height: 1.5;
+            margin-bottom: 2rem !important;
+            padding: 0 0.5rem;
+          }
+          /* Mobile specific heading improvements */
+          h1, h2, h3, h4, h5, h6 {
+            word-wrap: break-word;
+            hyphens: auto;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
+          .gradient-text {
+            display: inline-block;
+            word-break: break-word;
+            background-attachment: fixed;
+          }
+          /* Better mobile text spacing */
+          .text-center {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+          }
+          /* Mobile specific card text improvements */
+          .card h3, .card h4, .card h5 {
+            font-size: 1.1rem !important;
+            line-height: 1.3;
+            margin-bottom: 0.75rem !important;
+          }
+          .card p {
+            font-size: 0.9rem !important;
+            line-height: 1.4;
+          }
           
-          <Navbar.Toggle aria-controls="navbarNav" className="border-0" />
-          <Navbar.Collapse id="navbarNav">
-            <Nav className="mx-auto">
-              <Nav.Link href="#features" className="nav-link">Features</Nav.Link>
-              <Nav.Link href="#how-it-works" className="nav-link">How It Works</Nav.Link>
-              <Nav.Link href="#about" className="nav-link">About</Nav.Link>
-              <Nav.Link href="#pricing" className="nav-link">Pricing</Nav.Link>
-              <Nav.Link href="#faq" className="nav-link">FAQ</Nav.Link>
-              <Nav.Link href="/privacy" className="nav-link">Privacy</Nav.Link>
-            </Nav>
-            
-            <div className="d-flex gap-3 align-items-center">
-              <Button 
-                variant="outline" 
-                href="/login" 
-                className="btn btn-outline d-none d-lg-flex"
-              >
-                Log In
-              </Button>
-              <Button 
-                variant="primary" 
-                href="/register" 
-                className="btn btn-primary"
-                onClick={handleStartClick}
-              >
-                🚀 Start for Free
-              </Button>
-            </div>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
+          /* Mobile testimonials section improvements */
+          .section-title .gradient-text {
+            font-size: 1.4rem !important;
+            display: inline-block;
+            line-height: 1.2;
+            margin: 0 0.2rem;
+          }
+          
+          /* Mobile specific title wrapping */
+          .section-title {
+            word-break: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+          }
+          
+          /* Better mobile spacing for testimonials */
+          .testimonials .section-title {
+            font-size: 1.4rem !important;
+            line-height: 1.3;
+            margin-bottom: 1.5rem !important;
+          }
+          
+          /* Mobile badge improvements */
+          .badge {
+            font-size: 0.7rem !important;
+            padding: 0.4rem 0.8rem !important;
+          }
+          
+          /* Enhanced mobile title improvements */
+          .section-title {
+            text-align: center !important;
+            padding: 0 1rem !important;
+            margin-bottom: 1rem !important;
+          }
+          
+          /* Mobile title stacking */
+          .section-title .d-block {
+            display: block !important;
+            margin-bottom: 0.2rem;
+            width: 100%;
+          }
+          
+          .section-title .d-block:last-child {
+            margin-bottom: 0;
+          }
+          
+          /* Ensure gradient text doesn't break */
+          .section-title .gradient-text {
+            white-space: nowrap !important;
+            display: block !important;
+            width: 100%;
+          }
+          
+          /* Force all section title content to stack on mobile */
+          .section-title .d-block.d-md-inline {
+            display: block !important;
+            width: 100%;
+            text-align: center;
+          }
+          
+          /* Additional mobile section title fixes */
+          .section-title {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          
+          .section-title h2 {
+            display: block !important;
+            width: 100% !important;
+            margin-bottom: 0.1rem !important;
+          }
+          
+          .section-title h2:last-child {
+            margin-bottom: 0 !important;
+          }
+          
+          /* Mobile gradient text improvements */
+          .gradient-text {
+            background-attachment: scroll !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
+            display: inline-block !important;
+            word-break: break-word !important;
+          }
+          
+          /* Mobile specific spacing */
+          .mb-4 {
+            margin-bottom: 1.5rem !important;
+          }
+          
+          .mb-5 {
+            margin-bottom: 2rem !important;
+          }
+          .g-5 { gap: 1.5rem !important; }
+          
+          /* Mobile Navigation */
+          .navbar-brand {
+            font-size: 1.1rem;
+          }
+          .navbar-toggler {
+            padding: 0.25rem 0.5rem;
+            font-size: 1rem;
+          }
+          .navbar-collapse {
+            margin-top: 1rem;
+            padding: 1rem 0;
+            background: rgba(11, 13, 23, 0.95);
+            border-radius: 8px;
+            backdrop-filter: blur(20px);
+          }
+          .nav-link {
+            padding: 0.5rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          .nav-link:last-child {
+            border-bottom: none;
+          }
+          
+          /* Mobile Hero Section */
+          .hero-bg .container {
+            padding: 0 1rem;
+          }
+          .code-snippet {
+            padding: 1rem;
+            font-size: 0.8rem;
+          }
+          .api-endpoint {
+            padding: 8px 12px;
+            font-size: 0.75rem;
+          }
+          
+          /* Mobile Features */
+          .feature-nav-item {
+            padding: 1rem !important;
+            margin-bottom: 1rem !important;
+          }
+          .fixed-content-card {
+            height: 300px !important;
+          }
+          .fixed-content-card img {
+            height: 150px !important;
+          }
+          
+          /* Mobile Steps */
+          .steps .col-md-4 {
+            margin-bottom: 2rem;
+          }
+          .steps img {
+            height: 150px !important;
+          }
+          
+          /* Mobile Pricing */
+          .pricing .col-md-4 {
+            margin-bottom: 1.5rem;
+          }
+          
+          /* Mobile Footer */
+          .footer .col-md-6 {
+            margin-bottom: 2rem;
+            text-align: center;
+          }
+        }
 
-      <div className="page-wrapper">
-        {/* Professional Hero Section */}
-        <section className="hero-section section" style={{ marginTop: 0, paddingTop: '5rem' }}>
-        <Container>
-          <Row className="align-items-center min-vh-100 landing-page">
-            <Col lg={6} className="text-center text-lg-start">
-              <div className="hero-content">
-                <h1 className="heading-1 mb-6">
-                  Less Code, <span className="text-gradient">Build Fast.</span><br />
-                  Instantly.
-                </h1>
-                <p className="body-large text-light mb-8" style={{ maxWidth: '500px' }}>
-                  Backlify is the AI-powered platform that eliminates the need for backend coding. 
-                  Simply describe your idea, and let our AI generate the database schema and ready-to-use APIs for you.
-                </p>
-                <div className="d-flex gap-4 flex-wrap justify-content-center justify-content-lg-start">
-                  <Button 
-                    variant="primary" 
-                    size="lg"
-                    href="/register" 
-                    className="btn btn-primary btn-lg"
-                    onClick={handleStartClick}
-                  >
-                    ✨ Start Building with AI
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="lg"
-                    href="#how-it-works" 
-                    className="btn btn-outline btn-lg"
-                  >
-                    Learn More
-                  </Button>
-                </div>
-              </div>
-            </Col>
-            <Col lg={6}>
-              <div className="animate-float">
-    <div className="dynamic-visual-container">
-        {/* YUXARIDA SABİT QALAN PROMPT HİSSƏSİ */}
-        <div style={{ width: '100%' }}>
-                         <h5 className="mb-3 fw-bold text-center">💻 Your Prompt</h5>
-            <div className="prompt-box">
-              <span key={loopKey} className="typing-effect">Build a blog API where users can write posts, comments</span>
-            </div>
-        </div>
+        @media (max-width: 767.98px) {
+          .hero-bg { 
+            padding-top: 5rem !important; 
+            padding-bottom: 3rem !important; 
+          }
+          .nav-blur { 
+            padding: 0.5rem 0; 
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+          }
+          .section-padding { padding: 3rem 0; }
+          .hero-title { 
+            font-size: 2.4rem !important; 
+            line-height: 1.15;
+            margin-bottom: 1.5rem !important;
+            letter-spacing: -0.02em;
+          }
+          .section-title { 
+            font-size: 1.9rem !important; 
+            line-height: 1.25;
+            margin-bottom: 1rem !important;
+            letter-spacing: -0.01em;
+          }
+          .hero-subtitle {
+            font-size: 1.1rem !important;
+            line-height: 1.5;
+            margin-bottom: 2rem !important;
+          }
+          .g-5 { gap: 2rem !important; }
+          
+          /* Tablet Navigation */
+          .navbar-collapse {
+            background: transparent;
+            margin-top: 0;
+            padding: 0;
+          }
+          .nav-link {
+            padding: 0.5rem 1rem;
+            border-bottom: none;
+          }
+          
+          /* Tablet Features */
+          #features {
+            height: 150vh !important;
+          }
+          .fixed-content-card {
+            height: 400px !important;
+          }
+        }
 
-        {/* AŞAĞIDA DƏYİŞƏN ANİMASİYA HİSSƏSİ */}
-        <div className="animation-stages-wrapper">
-            {renderAnimationStage()}
-        </div>
-    </div>
-</div>
-            </Col>
-          </Row>
-        </Container>
-      </section>
+        @media (max-width: 991.98px) {
+          .hero-bg { 
+            padding-top: 6rem !important; 
+            padding-bottom: 4rem !important; 
+          }
+          .section-padding { padding: 4rem 0; }
+          .hero-title { 
+            font-size: 2.8rem !important; 
+            line-height: 1.1;
+            margin-bottom: 1.5rem !important;
+            letter-spacing: -0.02em;
+          }
+          .section-title { 
+            font-size: 2.2rem !important; 
+            line-height: 1.2;
+            margin-bottom: 1rem !important;
+            letter-spacing: -0.01em;
+          }
+          .hero-subtitle {
+            font-size: 1.2rem !important;
+            line-height: 1.5;
+            margin-bottom: 2rem !important;
+          }
+          .g-5 { gap: 2.5rem !important; }
+          
+          /* Desktop Features */
+          #features {
+            height: 200vh !important;
+          }
+          .fixed-content-card {
+            height: 500px !important;
+          }
+        }
 
-      {/* Features Section */}
-      <section id="features" className="section-padding">
-        <Container>
-          <div className="section-header text-center">
-            <h2 className="section-title">Everything You Need for a <span className="gradient-text">Powerful Backend</span></h2>
-            <p className="section-subtitle">From rapid prototyping to enterprise-level applications, Backlify provides the tools for success.</p>
-          </div>
-          <Row className="g-4">
-            <Col md={6} lg={3}>
-              <Card className="feature-card">
-                <div className="feature-icon bg-gradient-primary">🚀</div>
-                <h5 className="mb-3 text-white">Fast Development</h5>
-                <p className="text-secondary">Go from idea to a production-ready backend in minutes, not weeks. Accelerate your workflow by up to 90%.</p>
-              </Card>
-            </Col>
-            <Col md={6} lg={3}>
-              <Card className="feature-card">
-                                 <div className="feature-icon" style={{background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)'}}>♾️</div>
-                <h5 className="mb-3  text-white">Unlimited Integration</h5>
-                <p className="text-secondary">Connect to any frontend framework. Your generated REST API works seamlessly with React, Vue, Angular, and more.</p>
-              </Card>
-            </Col>
-            <Col md={6} lg={3}>
-              <Card className="feature-card">
-                                 <div className="feature-icon" style={{background: 'linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)'}}>🛡️</div>
-                <h5 className="mb-3  text-white" >Built-in Security</h5>
-                <p className="text-secondary">Enterprise-grade security out-of-the-box with JWT-based authentication, authorization, and secure endpoints.</p>
-              </Card>
-            </Col>
-            <Col md={6} lg={3}>
-              <Card className="feature-card">
-                                 <div className="feature-icon" style={{background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'}}>📈</div>
-                <h5 className="mb-3  text-white">Automatic Scalability</h5>
-                <p className="text-secondary">Built on a serverless architecture that automatically scales from zero to millions of requests without any configuration.</p>
-              </Card>
-            </Col>
-          </Row>
-        </Container>
-      </section>
-      
-      {/* How It Works Section */}
-      <section id="how-it-works" className="section-padding" style={{ background: "rgba(255, 255, 255, 0.02)" }}>
-        <Container>
-          <div className="section-header text-center">
-            <h2 className="section-title">From Prompt to API in <span className="gradient-text">3 Simple Steps</span></h2>
-          </div>
-          <Row className="g-5 align-items-center">
-            <Col md={4}>
-              <div className="step-card">
-                <div className="step-number">01</div>
-                                 <div className="step-icon bg-gradient-primary mx-auto animate-pulse-glow">💡</div>
-                <h4 className="mb-3">Describe Your Idea</h4>
-                <p className="text-secondary">Write in plain English how your backend should work. For example: "Users can order products."</p>
-              </div>
-            </Col>
-            <Col md={4}>
-              <div className="step-card">
-                <div className="step-number">02</div>
-                                 <div className="step-icon mx-auto animate-pulse-glow" style={{background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)'}}>🤖</div>
-                <h4 className="mb-3">Let AI Do the Work</h4>
-                <p className="text-secondary">Backlify's AI analyzes your text and instantly generates all the database tables, relationships, and API endpoints.</p>
-              </div>
-            </Col>
-            <Col md={4}>
-              <div className="step-card">
-                <div className="step-number">03</div>
-                                 <div className="step-icon mx-auto animate-pulse-glow" style={{background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'}}>🔗</div>
-                <h4 className="mb-3">Integrate & Launch</h4>
-                <p className="text-secondary">Your API is live! Connect it to your frontend application and launch your project in record time.</p>
-              </div>
-            </Col>
-          </Row>
-        </Container>
-      </section>
-      
-      {/* About Us Section */}
-      <section id="about" className="section-padding" style={{ background: "rgba(255, 255, 255, 0.02)" }}>
-        <Container>
-          <div className="section-header text-center">
-            <h2 className="section-title">About <span className="gradient-text">Backlify</span></h2>
-            <p className="section-subtitle">
-              We're on a mission to democratize backend development and make it accessible to everyone.
-            </p>
-          </div>
-          <Row className="g-5 align-items-center">
-            <Col lg={6}>
-              <div className="about-content">
-                <h3 className="mb-4 text-white">Our Story</h3>
-                <p className="text-secondary mb-4">
-                  Backlify was born from a simple observation: while frontend development has become increasingly visual and accessible, 
-                  backend development remains complex and time-consuming. We believe that great ideas shouldn't be held back by technical barriers.
-                </p>
-                <p className="text-secondary mb-4">
-                  Our team of experienced developers and AI researchers came together to create a platform that bridges this gap. 
-                  We've combined cutting-edge artificial intelligence with intuitive design to make backend development as simple as describing your idea.
-                </p>
-                <div className="d-flex gap-4 mb-4">
-                  <div className="stat-item">
-                    <h4 className="gradient-text mb-1">10K+</h4>
-                    <p className="text-secondary small mb-0">APIs Generated</p>
-                  </div>
-                  <div className="stat-item">
-                    <h4 className="gradient-text mb-1">500+</h4>
-                    <p className="text-secondary small mb-0">Happy Developers</p>
-                  </div>
-                  <div className="stat-item">
-                    <h4 className="gradient-text mb-1">99.9%</h4>
-                    <p className="text-secondary small mb-0">Uptime</p>
-                  </div>
-                </div>
-              </div>
-            </Col>
-            <Col lg={6}>
-              <div className="about-visual">
-                <div className="team-grid">
-                  <div className="team-card">
-                    <div className="team-avatar">👨‍💻</div>
-                    <h6 className="text-white mb-1">AI Engineers</h6>
-                    <p className="text-secondary small">Building the future of development</p>
-                  </div>
-                  <div className="team-card">
-                    <div className="team-avatar">🎨</div>
-                    <h6 className="text-white mb-1">UX Designers</h6>
-                    <p className="text-secondary small">Creating intuitive experiences</p>
-                  </div>
-                  <div className="team-card">
-                    <div className="team-avatar">🔧</div>
-                    <h6 className="text-white mb-1">DevOps Experts</h6>
-                    <p className="text-secondary small">Ensuring reliability & scale</p>
-                  </div>
-                  <div className="team-card">
-                    <div className="team-avatar">🚀</div>
-                    <h6 className="text-white mb-1">Product Team</h6>
-                    <p className="text-secondary small">Driving innovation forward</p>
-                  </div>
-                </div>
-              </div>
-            </Col>
-          </Row>
-          <Row className="mt-5">
-            <Col lg={12}>
-              <div className="mission-statement">
-                <div className="mission-card">
-                  <h4 className="text-white mb-3">Our Mission</h4>
-                  <p className="text-secondary mb-4">
-                    To eliminate the complexity of backend development and empower creators, entrepreneurs, and developers 
-                    to focus on what matters most: building amazing products that solve real-world problems.
-                  </p>
-                  <div className="values-grid">
-                    <div className="value-item">
-                      <div className="value-icon">🎯</div>
-                      <h6 className="text-white mb-2">Innovation</h6>
-                      <p className="text-secondary small">Pushing the boundaries of what's possible with AI</p>
-                    </div>
-                    <div className="value-item">
-                      <div className="value-icon">🤝</div>
-                      <h6 className="text-white mb-2">Accessibility</h6>
-                      <p className="text-secondary small">Making advanced technology available to everyone</p>
-                    </div>
-                    <div className="value-item">
-                      <div className="value-icon">⚡</div>
-                      <h6 className="text-white mb-2">Speed</h6>
-                      <p className="text-secondary small">Delivering results in minutes, not months</p>
-                    </div>
-                    <div className="value-item">
-                      <div className="value-icon">🛡️</div>
-                      <h6 className="text-white mb-2">Reliability</h6>
-                      <p className="text-secondary small">Enterprise-grade security and performance</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Col>
-          </Row>
-        </Container>
-      </section>
-{/* Pricing Section */}
-<section id="pricing" className="section-padding">
-  <Container>
-    <div className="section-header text-center">
-      <h2 className="section-title">Simple Pricing for <span className="gradient-text">Every Need</span></h2>
-      <p className="section-subtitle">Choose the plan that fits your project. Scale as you grow. No hidden fees.</p>
-    </div>
-    
-    {plansLoading ? (
-      <div className="text-center">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-        <p className="text-secondary mt-3">Loading pricing plans...</p>
-      </div>
-    ) : (
-      <Row className="g-4 justify-content-center">
-        {subscriptionPlans.map((plan, index) => (
-          <Col md={6} lg={4} key={plan.id}>
-            <div className={`pricing-card ${plan.id === 'pro' ? 'popular' : ''}`}>
-              {plan.id === 'pro' && <div className="popular-badge">Most Popular</div>}
-              <h5 className="mb-3">{plan.name}</h5>
-              <div className="price mb-3 gradient-text">
-                {subscriptionService.formatPrice(plan.price, plan.currency)}
-                {plan.price > 0 && <span className="text-secondary fs-5">/mo</span>}
-              </div>
-              <p className="text-white small mb-3">
-                {plan.id === 'basic' && 'Perfect for getting started'}
-                {plan.id === 'pro' && 'For growing applications'}
-                {plan.id === 'enterprise' && 'For advanced functionality'}
-              </p>
-              <ul className="list-unstyled text-secondary">
-                {plan.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="mb-2">
-                    <span className="text-success me-2">•</span>{feature}
-                  </li>
-                ))}
-              </ul>
-              <a 
-                href={plan.price === 0 ? "/register" : "/payment/plans"} 
-                className={`${plan.id === 'pro' ? 'btn-gradient' : 'btn-outline-custom'} w-100 mt-auto`} 
-                onClick={handleStartClick}
-              >
-                {plan.price === 0 ? 'Start for Free' : 'Choose Plan'}
-              </a>
-            </div>
-          </Col>
+        @media (min-width: 1200px) {
+          .section-padding { padding: 6rem 0; }
+          .g-5 { gap: 4rem !important; }
+        }
+
+        /* Smooth scrolling and performance - Desktop only */
+        @media (min-width: 992px) {
+          html {
+            scroll-behavior: smooth;
+          }
+        }
+        
+        /* Mobile scroll optimization */
+        @media (max-width: 991.98px) {
+          html {
+            scroll-behavior: auto !important;
+            overflow-x: hidden;
+          }
+          
+          body {
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: auto !important;
+            overscroll-behavior: none;
+            overflow-x: hidden;
+            position: relative;
+          }
+          
+          * {
+            scroll-behavior: auto !important;
+          }
+          
+          /* Disable all transforms and animations that might cause scroll issues */
+          .animate-fade-up,
+          .animate-slide-in,
+          .animate-scale,
+          .animate-float {
+            animation: none !important;
+            transform: none !important;
+            transition: none !important;
+          }
+          
+          /* Ensure no sticky positioning on mobile */
+          .position-sticky {
+            position: static !important;
+          }
+        }
+        
+/* Base navbar styles */
+.navbar {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  overflow-x: hidden;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+.navbar .container {
+  max-width: 100% !important;
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.nav-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(11, 13, 23, 0.9);
+}
+
+/* Fix collapse functionality */
+.navbar-collapse {
+  max-width: 100%;
+  overflow-x: hidden;
+  transition: height 0.35s ease;
+}
+
+.navbar-collapse.collapse:not(.show) {
+  display: none;
+}
+
+.navbar-collapse.collapsing {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.35s ease;
+}
+
+.navbar-collapse.collapse.show {
+  display: block;
+}
+
+/* Toggler fixes */
+.navbar-toggler {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0.25rem 0.5rem;
+  background: transparent !important;
+}
+
+.navbar-toggler:focus,
+.navbar-toggler:active,
+.navbar-toggler:hover {
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* Mobile specific styles */
+@media (max-width: 991.98px) {
+  .navbar {
+    padding: 0.5rem 0;
+  }
+  
+  .navbar .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .navbar-brand .h5 {
+    font-size: 1.1rem;
+  }
+  
+  .navbar-collapse {
+    margin-top: 1rem;
+    padding: 1.5rem 1rem;
+    background: rgba(11, 13, 23, 0.98);
+    border-radius: 12px;
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  
+  .nav-link {
+    padding: 0.75rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin: 0;
+    transition: all 0.2s ease;
+    display: block;
+    width: 100%;
+  }
+  
+  .nav-link:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0.5rem;
+  }
+  
+  .nav-link:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #00D2FF !important;
+    border-radius: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  /* Button container mobil üçün */
+  .navbar-collapse .d-flex {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    width: 100%;
+  }
+  
+  .navbar-collapse .d-flex .btn {
+    width: 100%;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 575.98px) {
+  .navbar {
+    padding: 0.4rem 0;
+  }
+  
+  .navbar .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  .navbar-brand .me-2 {
+    margin-right: 0.5rem !important;
+  }
+  
+  .navbar-brand .h5 {
+    font-size: 1rem;
+  }
+  
+  .navbar-collapse {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+  }
+  
+  .nav-link {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Glow effect */
+.glow-effect {
+  box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.glow-effect:hover {
+  box-shadow: 0 6px 30px rgba(0, 210, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+        /* Feature Navigation Animation */
+        .feature-nav-item {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .feature-nav-item:hover {
+          transform: scale(1.02);
+          box-shadow: 0 20px 60px rgba(0, 210, 255, 0.2);
+        }
+
+        /* Navigation Dots Animation */
+        .nav-dot:hover {
+          transform: scale(1.2);
+        }
+
+        /* Content Card Animation */
+        .fixed-content-card {
+          transition: all 0.3s ease;
+        }
+
+        .fixed-content-card img {
+          transition: all 0.3s ease;
+        }
+
+        /* Smooth feature content transitions */
+        .feature-nav-item {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .feature-content-transition {
+          transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        /* Feature content switching animations */
+        .feature-content-switch {
+          transition: all 0.2s ease-in-out;
+        }
+
+        .feature-content-switch img {
+          transition: all 0.2s ease-in-out;
+        }
+
+        .feature-content-switch h3,
+        .feature-content-switch p,
+        .feature-content-switch .badge {
+          transition: all 0.2s ease-in-out;
+        }
+
+        /* Smooth fade transition for content changes */
+        .feature-content-fade {
+          animation: contentFade 0.2s ease-in-out;
+        }
+
+        @keyframes contentFade {
+          0% { opacity: 0.8; transform: scale(0.98); }
+          50% { opacity: 0.9; transform: scale(0.99); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        
+        /* Mobile scroll optimization */
+        @media (max-width: 991.98px) {
+          .feature-content-transition,
+          .feature-content-switch,
+          .feature-content-fade {
+            transition: none !important;
+            animation: none !important;
+          }
+          
+          .feature-nav-item {
+            transition: none !important;
+          }
+          
+          .fixed-content-card {
+            transition: none !important;
+          }
+        }
+      `}</style>
+
+      <div className="min-h-screen relative">
+        {/* Floating Particles */}
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="particle"
+            style={{
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 25}s`,
+              animationDuration: `${20 + Math.random() * 15}s`
+            }}
+          />
         ))}
-      </Row>
-    )}
-  </Container>
-</section>
 
-      {/* Testimonials Section */}
-      {/* <section id="testimonials" className="section-padding">
-        <Container>
-          <div className="section-header text-center">
-            <h2 className="section-title">Loved by <span className="gradient-text">Developers</span> Worldwide</h2>
+        {/* Hero Section */}
+        <section
+        ref={heroRef}
+          id="hero"
+          className="hero-bg bg-grid section-padding position-relative overflow-hidden"
+          style={{  paddingBottom: '6rem' }}
+        >
+          <Container className="text-center position-relative" style={{zIndex: 10}}>
+            <div className={`animate-fade-up ${isVisible.hero ? 'visible' : ''}`}>
+              <div 
+                className="d-inline-flex align-items-center rounded-pill px-4 py-2 mb-4"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+                  border: '1px solid rgba(34, 211, 238, 0.2)'
+                }}
+              >
+                <span 
+                  className="rounded-circle me-2"
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    backgroundColor: '#22d3ee',
+                    animation: 'pulse 2s infinite'
+                  }}
+                ></span>
+                <span className="text-cyan-400 medium fw-medium font-mono">AI-Powered Backend Generation</span>
+              </div>
+
+              <h1 class="hero-title fw-bold text-white mb-4 text-center text-md-start">
+  Build Backends with
+  <br />
+  <span class="gradient-text typing-animation font-monospace text-nowrap">
+    Natural Language
+  </span>
+</h1>
+
+
+              <div className="hero-subtitle text-light mb-4 mx-auto" style={{maxWidth: '800px'}}>
+                Transform your ideas into production-ready APIs in minutes, not months.
+                <br />
+                <span className="gradient-text-alt fw-medium">Code Less, Build More – Instant Backend at Your Fingertips!</span>
+              </div>
+
+              <div className="d-flex flex-column flex-sm-row align-items-center justify-content-center gap-3 mb-5">
+                <Button 
+                  size="lg"
+                  className="btn-primary glow-effect hover-lift border-0 fw-medium w-50 w-sm-auto"
+                  onClick={handleStartClick}
+                  style={{
+                    background: 'linear-gradient(135deg,rgb(0, 152, 186)00%)',
+                    padding: '16px 32px',
+                    borderRadius: '12px',
+                    fontSize: '1rem'
+                  }}
+                >
+                   Start Building Free
+                </Button>
+                {/* <Button 
+                  variant="outline-light" 
+                  size="lg"
+                  className="btn-outline fw-medium w-100 w-sm-auto"
+                  style={{
+                    padding: '14px 30px',
+                    borderRadius: '12px',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <span className="me-2">▶</span>
+                  View Demo
+                </Button> */}
+              </div>
+
+              <Row className="justify-content-center mb-5 g-2">
+                <Col xs={12} sm="auto" className="d-flex align-items-center justify-content-center">
+                  <span 
+                    className="rounded-circle me-2"
+                    style={{width: '8px', height: '8px', backgroundColor: '#22c55e'}}
+                  ></span>
+                  <span className="font-mono small text-white">99.9% Uptime</span>
+            </Col>
+                <Col xs={12} sm="auto" className="d-flex align-items-center justify-content-center">
+                  <span 
+                    className="rounded-circle me-2"
+                    style={{width: '8px', height: '8px', backgroundColor: '#22d3ee'}}
+                  ></span>
+                  <span className="font-mono small text-white">10x Faster Development</span>
+                </Col>
+                <Col xs={12} sm="auto" className="d-flex align-items-center justify-content-center">
+                  <span 
+                    className="rounded-circle me-2"
+                    style={{width: '8px', height: '8px', backgroundColor: '#a855f7'}}
+                  ></span>
+                  <span className="font-mono small text-white">Enterprise Security</span>
+                </Col>
+              </Row>
+
+              <div
+                className="position-relative animate-float mx-auto"
+                style={{ 
+                  transform: window.innerWidth >= 992 ? `translateY(${scrollY * 0.15}px)` : 'none',
+                  maxWidth: '900px'
+                }}
+              >
+                <div className="api-card p-4 glow-effect">
+                  <div className="code-snippet">
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <div className="d-flex align-items-center">
+                        <div 
+                          className="rounded-circle me-1"
+                          style={{width: '12px', height: '12px', backgroundColor: '#ef4444'}}
+                        ></div>
+                        <div 
+                          className="rounded-circle me-1"
+                          style={{width: '12px', height: '12px', backgroundColor: '#eab308'}}
+                        ></div>
+                        <div 
+                          className="rounded-circle"
+                          style={{width: '12px', height: '12px', backgroundColor: '#22c55e'}}
+                        ></div>
+                </div>
+                      <span className="text-white small font-mono">backlify-ai-generator</span>
+                </div>
+                    <div className="text-start">
+                      <div className="api-endpoint mb-2">
+                        <span className="text-success font-mono">POST</span>
+                        <span className="text-info font-mono ms-3">/api/users</span>
+                        <span className="text-white ms-3">// Create new user</span>
+                      </div>
+                      <div className="api-endpoint mb-2">
+                        <span className="text-primary font-mono">GET</span>
+                        <span className="text-info font-mono ms-4">/api/products</span>
+                        <span className="text-white ms-3">// Fetch products</span>
+                      </div>
+                      <div className="api-endpoint mb-2">
+                        <span className="text-warning font-mono">POST</span>
+                        <span className="text-info font-mono ms-3">/api/orders</span>
+                        <span className="text-white ms-3">// Process orders</span>
+                      </div>
+                      <div className="text-info font-mono small mt-3">
+                        + 15 more endpoints generated automatically
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+        </Container>
+        </section>
+
+         {/* Features Section - Desktop Only */}
+        <section
+          ref={featuresRef}
+          id="features"
+          className="position-relative d-none d-lg-block"
+          style={{
+            background: 'linear-gradient(135deg,rgb(2, 7, 17) 0%,rgb(18, 28, 44) 50%,#0F172A 100%)',
+            height: `${mockFeatures.length * 100}vh`
+          }}
+        >
+          {/* Invisible scroll triggers positioned throughout the section (outside sticky container) */}
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${mockFeatures.length * 100}vh`, pointerEvents: 'none' }}>
+            {mockFeatures.map((_, index) => (
+              <div
+                key={index}
+                style={{
+                  position: 'absolute',
+                  top: `${(index / mockFeatures.length) * 100}%`,
+                  height: `${100 / mockFeatures.length}%`,
+                  width: '100%',
+                  pointerEvents: 'none',
+                  opacity: 0
+                }}
+                ref={(el) => {
+                  if (el) {
+                    featureItemRefs.current[index] = el;
+                  }
+                }}
+              />
+            ))}
           </div>
-          <Row className="g-4">
-            <Col md={4}>
-              <Card className="testimonial-card h-100">
-                <blockquote className="mb-4 text-secondary fst-italic">"Backlify changed the game for us. What used to take weeks of backend development now takes a few hours. Absolutely brilliant!"</blockquote>
-                <div className="d-flex align-items-center">
-                  <img src="https://i.pravatar.cc/50?img=1" alt="Alex Chen - VP Engineering at TechCorp" className="avatar me-3" loading="lazy" width="50" height="50" />
-                  <div>
-                    <h6 className="mb-0 text-white">Alex Chen</h6>
-                    <small className="text-light">VP Engineering, TechCorp</small>
-                  </div>
+
+          <div 
+            className="position-sticky" 
+            style={{
+              top: '0',
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}
+          >
+            <Container>
+              {/* Section Header */}
+              <div className={`text-center mb-5 animate-fade-up ${isVisible.features ? 'visible' : ''}`}>
+                <div 
+                  className="d-inline-flex align-items-center rounded-pill px-4 py-2 mb-4"
+                  style={{
+                    background: 'rgba(31, 41, 55, 0.5)',
+                    border: '1px solid rgba(55, 65, 81, 0.5)'
+                  }}
+                >
+                  <span className="text-white small fw-medium font-mono text-uppercase">Platform Features</span>
                 </div>
-              </Card>
-            </Col>
-            <Col md={4}>
-              <Card className="testimonial-card h-100">
-                <blockquote className="mb-4 text-secondary fst-italic">"The AI schema generation is magical. Now our entire team can rapidly prototype ideas, not just our backend engineers."</blockquote>
-                <div className="d-flex align-items-center">
-                  <img src="https://i.pravatar.cc/50?img=2" alt="Sarah Johnson - CTO at StartupHub" className="avatar me-3" loading="lazy" width="50" height="50" />
-                  <div>
-                    <h6 className="mb-0 text-white">Sarah Johnson</h6>
-                    <small className="text-light">CTO, StartupHub</small>
+              <h2 className="section-title fw-bold text-white mb-2" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">Everything You Need for</div>
+              </h2>
+              <h2 className="section-title fw-bold gradient-text mb-4" style={{fontSize: 'clamp(1.3rem, 4.5vw, 2.6rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">Modern Backend Development</div>
+              </h2>
+              </div>
+
+              {/* Fixed Features Layout */}
+              <Row className="align-items-center g-4">
+                {/* Left Side - Single Active Feature Navigation */}
+                <Col lg={5} className="h-100 d-flex align-items-center">
+                  <div className="w-100">
+                    {/* Active Feature Display */}
+                    <div
+                      key={`feature-nav-${activeFeatureIndex}`}
+                      className="feature-nav-item feature-content-transition feature-content-switch feature-content-fade p-4 rounded-3 mb-4"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+                        border: '1px solid rgba(0, 210, 255, 0.3)',
+                        backdropFilter: 'blur(20px)',
+                        transition: 'all 0.5s ease'
+                      }}
+                    >
+                      <Row className="align-items-center g-3">
+                        <Col xs="auto">
+                          <div 
+                            className="rounded-3 d-flex align-items-center justify-content-center glow-effect"
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              background: 'linear-gradient(135deg, #00D2FF 0%, #3A7BD5 100%)',
+                              fontSize: '1.8rem',
+                              boxShadow: '0 15px 40px rgba(0, 210, 255, 0.4)'
+                            }}
+                          >
+                            {mockFeatures[activeFeatureIndex].icon}
+                          </div>
+                        </Col>
+                        <Col>
+                          <h3 className="h5 fw-bold text-white mb-2">{mockFeatures[activeFeatureIndex].title}</h3>
+                          <div 
+                            className="badge rounded-pill px-3 py-1 font-mono fw-medium"
+                            style={{
+                              background: 'rgba(0, 210, 255, 0.25)',
+                              color: '#00D2FF',
+                              border: '1px solid rgba(0, 210, 255, 0.4)',
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            {mockFeatures[activeFeatureIndex].stats}
+                          </div>
+                        </Col>
+                      </Row>
+                      <p className="text-white mt-3 mb-0" style={{lineHeight: '1.5', fontSize: '0.95rem'}}>
+                        {mockFeatures[activeFeatureIndex].description}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </Col>
-            <Col md={4}>
-              <Card className="testimonial-card h-100">
-                <blockquote className="mb-4 text-secondary fst-italic">"The security and scalability were critical for us. We scaled our startup quickly with Backlify without worrying about infrastructure."</blockquote>
-                <div className="d-flex align-items-center">
-                  <img src="https://i.pravatar.cc/50?img=3" alt="Mike Kim - Founder at AppBuilders" className="avatar me-3" loading="lazy" width="50" height="50" />
-                  <div>
-                    <h6 className="mb-0 text-white">Mike Kim</h6>
-                    <small className="text-light">Founder, AppBuilders</small>
-                  </div>
-                </div>
-              </Card>
-            </Col>
+                </Col>
+
+                {/* Right Side - Fixed Content Area */}
+                {/* Right Side - Fixed Content Area */}
+<Col lg={6} className="h-100 d-flex align-items-center">
+  <div className="w-100 position-relative px-2">
+    <Card
+      key={`feature-card-${activeFeatureIndex}`}
+      className="glass-card border-0 fixed-content-card feature-content-transition feature-content-switch feature-content-fade"
+      style={{
+        background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(246, 92, 92, 0.05) 100%)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(0, 210, 255, 0.2)',
+        borderRadius: '20px',
+        overflow: 'hidden',
+        height: '500px', // Reduced from 500px
+        maxWidth: '100%', // Added max width
+        margin: '0 auto' // Center the card
+      }}
+    >
+      {/* Feature Image */}
+      <div className="position-relative" style={{height: '55%'}}>
+        <img
+          src={mockFeatures[activeFeatureIndex].image}
+          alt={mockFeatures[activeFeatureIndex].title}
+          className="w-100 h-100"
+          style={{
+            objectFit: 'cover',
+            transition: 'all 0.5s ease'
+          }}
+        />
+        <div 
+          className="position-absolute top-0 start-0 w-100 h-100"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)'
+          }}
+        ></div>
+        
+        {/* Feature Icon Overlay */}
+        <div 
+          className="position-absolute top-50 start-50 translate-middle rounded-3 d-flex align-items-center justify-content-center glow-effect"
+          style={{
+            width: '70px', // Reduced from 80px
+            height: '70px',
+            background: 'linear-gradient(135deg, #00D2FF 0%, #3A7BD5 100%)',
+            fontSize: '2.2rem', 
+            boxShadow: '0 20px 60px rgba(0, 210, 255, 0.4)'
+          }}
+        >
+          {mockFeatures[activeFeatureIndex].icon}
+        </div>
+      </div>
+
+      <Card.Body className="p-3 d-flex flex-column justify-content-center" style={{height: '45%'}}> {/* Reduced padding and increased height percentage */}
+        <h3 className="h5 fw-bold text-white mb-2">{mockFeatures[activeFeatureIndex].title}</h3> {/* Reduced heading size and margin */}
+        <p 
+          className="text-white mb-3" // Reduced margin
+          style={{
+            lineHeight: '1.5', // Reduced line height
+            fontSize: '0.9rem' // Reduced font size
+          }}
+        >
+          {mockFeatures[activeFeatureIndex].description}
+        </p>
+        
+        <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-2">
+          <div 
+            className="badge rounded-pill px-3 py-2 font-mono fw-medium"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%)',
+              border: '1px solid rgba(0, 210, 255, 0.4)',
+              color: '#00D2FF',
+              fontSize: '0.8rem' // Reduced font size
+            }}
+          >
+            {mockFeatures[activeFeatureIndex].stats}
+          </div>
+          <Button
+            variant="outline-light"
+            size="sm"
+            className="rounded-pill"
+            style={{
+              borderColor: 'rgba(0, 210, 255, 0.3)',
+              color: '#00D2FF',
+              fontSize: '0.75rem' // Reduced font size
+            }}
+          >
+            Learn More →
+          </Button>
+        </div>
+      </Card.Body>
+    </Card>
+  </div>
+</Col>
           </Row>
         </Container>
-      </section> */}
-      
+          </div>
+        </section>
 
-      
-
-      {/* Final CTA Section */}
-      {/* === YENİ FAQ BÖLMƏSİ === */}
-      <section id="faq" className="section-padding">
-    <Container>
-        <div className="section-header text-center">
-            <h2 className="section-title">Frequently Asked <span className="gradient-text">Questions</span></h2>
-            <p className="section-subtitle">
-                Got questions? We've got answers. If you have any other questions, feel free to contact us.
-            </p>
-        </div>
-        <Row className="justify-content-center">
-            <Col lg={8}>
-                <Accordion defaultActiveKey="0" className="faq-accordion">
-                    <Accordion.Item eventKey="0">
-                        <Accordion.Header>Do I need coding skills to use Backlify?</Accordion.Header>
-                        <Accordion.Body>
-                            Not at all. Backlify is designed as a no-code / low-code backend platform.  
-                            You simply describe what you want, and our AI generates the database schema and API endpoints automatically.  
-                            Developers, however, can still fine-tune everything if needed.
-                        </Accordion.Body>
-                    </Accordion.Item>
-                    <Accordion.Item eventKey="1">
-                        <Accordion.Header>How does Backlify generate APIs?</Accordion.Header>
-                        <Accordion.Body>
-                            Backlify uses AI to analyze your prompt and automatically create a database schema, relationships, and fully documented REST endpoints.  
-                            You can preview and edit the schema visually before deploying.
-                        </Accordion.Body>
-                    </Accordion.Item>
-                    <Accordion.Item eventKey="2">
-                        <Accordion.Header>What kind of projects can I build with Backlify?</Accordion.Header>
-                        <Accordion.Body>
-                            Anything from MVPs and prototypes to production-grade apps.  
-                            Backlify is ideal for SaaS products, internal dashboards, mobile apps, and startups who need a backend fast without hiring a full team.
-                        </Accordion.Body>
-                    </Accordion.Item>
-                    <Accordion.Item eventKey="3">
-                        <Accordion.Header>How does pricing work?</Accordion.Header>
-                        <Accordion.Body>
-                            Backlify follows a usage-based pricing model.  
-                            Your first <b>1K API requests are free</b>. After that, you only pay for what you use – making it cost-effective for both small projects and enterprise applications.
-                        </Accordion.Body>
-                    </Accordion.Item>
-                    <Accordion.Item eventKey="4">
-                        <Accordion.Header>Can I integrate Backlify with my existing systems?</Accordion.Header>
-                        <Accordion.Body>
-                            Yes. Backlify APIs are standard REST endpoints, making it easy to connect with any frontend (React, Vue, Angular, mobile apps) or third-party service.  
-                            Soon, we’ll also add GraphQL support and external integrations.
-                        </Accordion.Body>
-                    </Accordion.Item>
-                    <Accordion.Item eventKey="5">
-                        <Accordion.Header>Is my data secure?</Accordion.Header>
-                        <Accordion.Body>
-                            Security is a top priority.  
-                            Your data is hosted on enterprise-grade cloud infrastructure, isolated per project.  
-                            You always retain full ownership of your data and can export it anytime in JSON or CSV formats.
-                        </Accordion.Body>
-                    </Accordion.Item>
-                </Accordion>
-            </Col>
-        </Row>
-    </Container>
-</section>
-<section id="contact" className="section-padding" style={{ background: "rgba(255, 255, 255, 0.02)" }}>
-        <Container>
-            <div className="section-header text-center">
-                <h2 className="section-title">Get In <span className="gradient-text">Touch</span></h2>
-                <p className="section-subtitle">
-                    Have a question or want to work together? Send us a message.
-                </p>
+        {/* Mobile Features Section */}
+        <section
+          id="mobile-features"
+          className="section-padding d-lg-none"
+          style={{background: 'linear-gradient(135deg,rgb(2, 7, 17) 0%,rgb(18, 28, 44) 50%,#0F172A 100%)'}}
+        >
+          <Container>
+            <div className="text-center mb-5">
+              <div 
+                className="d-inline-flex align-items-center rounded-pill px-4 py-2 mb-4"
+                style={{
+                  background: 'rgba(31, 41, 55, 0.5)',
+                  border: '1px solid rgba(55, 65, 81, 0.5)'
+                }}
+              >
+                <span className="text-white small fw-medium font-mono text-uppercase">Platform Features</span>
+              </div>
+              <h2 className="section-title fw-bold text-white mb-2" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">Everything You Need for</div>
+              </h2>
+              <h2 className="section-title fw-bold gradient-text mb-4" style={{fontSize: 'clamp(1.3rem, 4.5vw, 2.6rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">Modern Backend Development</div>
+              </h2>
             </div>
-            <Row className="justify-content-center">
-                <Col lg={7}>
-                    <div className="contact-form-container">
-                        <Form onSubmit={handleContactSubmit}>
-                            <Form.Group className="mb-3">
-                                <Form.Label className="text-secondary">Your Email</Form.Label>
-                                <Form.Control 
-                                    type="email" 
-                                    name="email"
-                                    placeholder="you@example.com" 
-                                    required 
-                                    className="form-control-contact"
-                                    value={contactForm.email}
-                                    onChange={handleContactChange}
-                                />
-                            </Form.Group>
-                            <Form.Group className="mb-4">
-                                <Form.Label className="text-secondary">Message</Form.Label>
-                                <Form.Control 
-                                    as="textarea" 
-                                    name="message"
-                                    rows={5} 
-                                    placeholder="Let us know how we can help!" 
-                                    required 
-                                    className="form-control-contact"
-                                    value={contactForm.message}
-                                    onChange={handleContactChange}
-                                />
-                            </Form.Group>
-                            <div className="text-center">
-                                <Button type="submit" className="btn-gradient px-5" disabled={isSending}>
-                                    {isSending ? 'Sending...' : 'Send Message'}
-                                </Button>
-                            </div>
-                        </Form>
+
+            <Row className="g-4">
+              {mockFeatures.map((feature, index) => (
+                <Col md={6} key={feature.title}>
+                  <Card className="glass-card border-0 h-100 hover-lift">
+                    <div className="position-relative" style={{height: '200px'}}>
+                      <img
+                        src={feature.image}
+                        alt={feature.title}
+                        className="w-100 h-100"
+                        style={{
+                          objectFit: 'cover',
+                          borderRadius: '16px 16px 0 0'
+                        }}
+                      />
+                      <div 
+                        className="position-absolute top-50 start-50 translate-middle rounded-3 d-flex align-items-center justify-content-center glow-effect"
+                        style={{
+                          width: '60px',
+                          height: '60px',
+                          background: 'linear-gradient(135deg, #00D2FF 0%, #3A7BD5 100%)',
+                          fontSize: '1.8rem',
+                          boxShadow: '0 15px 40px rgba(0, 210, 255, 0.4)'
+                        }}
+                      >
+                        {feature.icon}
+                      </div>
                     </div>
+                    <Card.Body className="p-4">
+                      <h3 className="h5 fw-bold text-white mb-2">{feature.title}</h3>
+                      <p className="text-white mb-3" style={{lineHeight: '1.5', fontSize: '0.9rem'}}>
+                        {feature.description}
+                      </p>
+                      <div 
+                        className="badge rounded-pill px-3 py-2 font-mono fw-medium"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%)',
+                          border: '1px solid rgba(0, 210, 255, 0.4)',
+                          color: '#00D2FF',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        {feature.stats}
+                      </div>
+                    </Card.Body>
+                  </Card>
                 </Col>
+              ))}
+            </Row>
+          </Container>
+        </section>
+
+        {/* How It Works Section */}
+        <section
+          ref={stepsRef}
+        id="how-it-works"
+          className="section-padding"
+          style={{background: 'linear-gradient(135deg, #0F172A 0%,rgb(11, 17, 27) 50%,rgb(18, 22, 29) 100%)'}}
+      >
+        <Container>
+            <div className={`text-center mb-5 animate-fade-up ${isVisible.steps ? 'visible' : ''}`}>
+              <div 
+                className="d-inline-flex align-items-center rounded-pill px-4 py-2 mb-4"
+                style={{
+                  background: 'rgba(31, 41, 55, 0.5)',
+                  border: '1px solid rgba(55, 65, 81, 0.5)'
+                }}
+              >
+                <span className="text-white small fw-medium font-mono text-uppercase">How It Works</span>
+          </div>
+              <h2 className="section-title fw-bold gradient-text mb-2" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">3 Simple Steps</div>
+              </h2>
+              <h2 className="section-title fw-bold text-white mb-4" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">From Idea to API</div>
+              </h2>
+            </div>
+
+          <Row className="g-4">
+              {steps.map((step, index) => (
+                <Col md={4} key={step.title}>
+                  <div
+                    className={`text-center animate-slide-in ${isVisible.steps ? 'visible' : ''}`}
+                    style={{ animationDelay: `${index * 0.3}s` }}
+                  >
+                    <div className="mb-4">
+                      <div className="display-1 fw-bold gradient-text font-mono mb-4">{step.number}</div>
+                      <div 
+                        className="rounded-3 p-4 hover-lift"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                          border: '1px solid rgba(0, 210, 255, 0.2)',
+                          backdropFilter: 'blur(20px)'
+                        }}
+                      >
+                        <img
+                          src={step.image}
+                          alt={step.title}
+                          className="img-fluid rounded-3 mb-3"
+                          style={{height: '200px', objectFit: 'cover', width: '100%'}}
+                        />
+                        <div 
+                          className="small text-info font-mono rounded-3 p-2"
+                          style={{background: 'rgba(17, 24, 39, 0.5)'}}
+                        >
+                          {step.mockup}
+                        </div>
+                      </div>
+                    </div>
+                    <h3 className="h4 fw-bold text-white mb-3">{step.title}</h3>
+                    <p className="text-light" style={{lineHeight: '1.6'}}>{step.description}</p>
+                  </div>
+              </Col>
+            ))}
+          </Row>
+        </Container>
+        </section>
+
+   
+        {/* Pricing Section */}
+        <section
+          ref={pricingRef}
+          id="pricing"
+          className="section-padding"
+          style={{background: 'linear-gradient(135deg, #0F172A 0%,rgb(20, 27, 39) 50%,rgb(15, 21, 29) 100%)'}}
+      >
+        <Container>
+            <div className={`text-center justify-content-center align-items-center d-flex flex-column mb-5 animate-fade-up ${isVisible.pricing ? 'visible' : ''}`}>
+              <div 
+                className="d-flex  justify-content-center align-items-center rounded-pill px-4 py-2 mb-4"
+                style={{
+                  background: 'rgba(31, 41, 55, 0.5)',
+                  border: '1px solid rgba(55, 65, 81, 0.5)'
+                }}
+              >
+                <span className="text-white small fw-medium font-mono text-uppercase">Pricing</span> <br />
+          </div>
+          
+              <h2 className="section-title fw-bold gradient-text mb-2" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">Simple Pricing</div>
+              </h2>
+              <h2 className="section-title fw-bold text-white mb-4" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+                <div className="d-block d-md-inline">for Every Team Size</div>
+              </h2>
+            </div>
+
+            {plansLoading ? (
+              <div className="text-center">
+                <div style={{
+                  display: 'inline-block',
+                  width: '32px',
+                  height: '32px',
+                  border: '2px solid transparent',
+                  borderTop: '2px solid #22d3ee',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                <p className="text-white mt-3">Loading pricing plans...</p>
+              </div>
+            ) : (
+              <Row className="g-4 justify-content-center">
+                {plansToShow.map((plan, index) => (
+                  <Col md={4} key={plan.id}>
+                    <Card
+                      className={`glass-card h-100 hover-lift animate-scale border-0 position-relative ${isVisible.pricing ? 'visible' : ''} ${plan.isPopular ? 'glow-effect popular-plan' : ''}`}
+                      style={{ 
+                        animationDelay: `${index * 0.2}s`,
+                        background: plan.isPopular 
+                          ? 'linear-gradient(135deg, rgba(30, 64, 175, 0.12) 0%, rgba(124, 58, 237, 0.12) 100%)'
+                          : 'linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                        backdropFilter: 'blur(20px)',
+                        border: plan.isPopular 
+                          ? '2px solid rgba(30, 64, 175, 0.6)' 
+                          : '1px solid rgba(0, 210, 255, 0.2)',
+                        boxShadow: plan.isPopular 
+                          ? '0 20px 40px rgba(30, 64, 175, 0.2), 0 0 0 1px rgba(30, 64, 175, 0.1)'
+                          : '0 10px 30px rgba(0, 0, 0, 0.2)',
+                        transform: plan.isPopular ? 'scale(1.02)' : 'scale(1)',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      {plan.isPopular && (
+                        <div className="position-absolute" style={{top: '-20px', left: '50%', transform: 'translateX(-50%)'}}>
+                          <span 
+                            className="badge text-white px-4 py-2 rounded-pill small fw-bold font-mono"
+                            style={{
+                              background: 'linear-gradient(135deg, #1e40af 0%, #7c3aed 100%)',
+                              boxShadow: '0 8px 25px rgba(30, 64, 175, 0.3)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              animation: 'pulse 2s infinite'
+                            }}
+                          >
+                            Most Popular
+                          </span>
+                        </div>
+                      )}
+
+                      <Card.Body className="p-4 text-center">
+                        <h3 className="h4 fw-bold text-white mb-2">{plan.name}</h3>
+                        <p className="text-white mb-4">{plan.description}</p>
+                        <div className="display-4 fw-bold text-white mb-2 font-mono">
+                          {typeof plan.price === 'number' ? `₼${plan.price}` : plan.price}
+                        </div>
+                        {typeof plan.price === 'number' && (
+                          <span className="text-white font-mono">/month</span>
+                        )}
+
+                        <ul className="list-unstyled my-4">
+                          {plan.features.map((feature, i) => (
+                            <li key={i} className="d-flex align-items-start text-light mb-3">
+                              <svg className="me-3 mt-1 flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{color: '#22d3ee'}}>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <Button 
+                          className={`w-100 fw-bold border-0 position-relative overflow-hidden pricing-button ${
+                            plan.isPopular ? 'btn-primary glow-effect' : 'btn-outline-light'
+                          }`}
+                          style={plan.isPopular ? {
+                            background: 'linear-gradient(135deg, #1e40af 0%, #7c3aed 100%)',
+                            padding: '16px 32px',
+                            borderRadius: '16px',
+                            fontSize: '1.1rem',
+                            boxShadow: '0 10px 30px rgba(30, 64, 175, 0.3)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.3s ease',
+                            transform: 'translateY(0)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          } : {
+                            background: 'rgba(31, 41, 55, 0.8)',
+                            border: '2px solid rgba(0, 210, 255, 0.3)',
+                            padding: '14px 28px',
+                            borderRadius: '12px',
+                            fontSize: '1rem',
+                            color: '#E2E8F0',
+                            transition: 'all 0.3s ease',
+                            backdropFilter: 'blur(10px)'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (plan.isPopular) {
+                              e.target.style.transform = 'translateY(-3px)';
+                              e.target.style.boxShadow = '0 15px 40px rgba(30, 64, 175, 0.4)';
+                            } else {
+                              e.target.style.borderColor = 'rgba(0, 210, 255, 0.6)';
+                              e.target.style.background = 'rgba(0, 210, 255, 0.1)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (plan.isPopular) {
+                              e.target.style.transform = 'translateY(0)';
+                              e.target.style.boxShadow = '0 10px 30px rgba(30, 64, 175, 0.3)';
+                            } else {
+                              e.target.style.borderColor = 'rgba(0, 210, 255, 0.3)';
+                              e.target.style.background = 'rgba(31, 41, 55, 0.8)';
+                            }
+                          }}
+                          onClick={handleStartClick}
+                        >
+                          {plan.isPopular && (
+                            <span className="position-absolute" style={{
+                              top: 0,
+                              left: '-100%',
+                              width: '100%',
+                              height: '100%',
+                              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
+                              transition: 'left 0.5s'
+                            }}></span>
+                          )}
+                          {plan.buttonText}
+                        </Button>
+                      </Card.Body>
+                    </Card>
+              </Col>
+            ))}
+          </Row>
+            )}
+        </Container>
+        </section>
+
+        {/* CTA Section */}
+        <section className="section-padding position-relative overflow-hidden" style={{background: 'linear-gradient(135deg, #0F172A 0%,rgb(18, 25, 37) 50%,rgb(27, 33, 42) 100%)'}}>
+          <div className="position-absolute w-100 h-100 bg-grid" style={{opacity: '0.3', top: 0, left: 0}}></div>
+          <Container className="text-center position-relative" style={{zIndex: 10, maxWidth: '800px'}}>
+            <h2 className="section-title fw-bold text-white mb-2" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+              <div className="d-block d-md-inline">Ready to</div>
+              <div className="d-block d-md-inline">
+                <span className="gradient-text" style={{fontSize: 'clamp(1.3rem, 4.5vw, 2.6rem)', display: 'inline-block', whiteSpace: 'nowrap'}}>Transform</span>
+              </div>
+            </h2>
+            <h2 className="section-title fw-bold text-white mb-4" style={{fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', lineHeight: '1.2'}}>
+              <div className="d-block d-md-inline">Your Development Workflow?</div>
+            </h2>
+            <p className="fs-5 text-light mb-5" style={{lineHeight: '1.6'}}>
+              Join thousands of developers who are building APIs 10x faster with Backlify.
+              Start your free trial today - no credit card required.
+            </p>
+            <div className="d-flex flex-column flex-sm-row align-items-center justify-content-center gap-3">
+              <Button 
+                size="lg"
+                className="btn-primary glow-effect hover-lift border-0 fw-semibold w-100 w-sm-auto"
+                onClick={handleStartClick}
+                style={{
+                  background: 'linear-gradient(135deg, #00D2FF 0%, #3A7BD5 100%)',
+                  padding: '16px 48px',
+                  borderRadius: '12px',
+                  fontSize: '18px'
+                }}
+              >
+                🚀 Start Free Trial
+          </Button>
+              <Button 
+                variant="outline-light" 
+                size="lg"
+                className="btn-outline fw-semibold font-mono w-100 w-sm-auto"
+                style={{
+                  padding: '14px 46px',
+                  borderRadius: '12px',
+                  fontSize: '18px',
+                  borderColor: 'rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                <svg className="me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                Read Documentation
+              </Button>
+            </div>
+        </Container>
+        </section>
+
+        {/* Footer */}
+        <footer className="section-padding" style={{background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%)', borderTop: '1px solid rgba(107, 114, 128, 0.5)'}}>
+        <Container>
+            <Row className="g-4 mb-5">
+              <Col lg={6}>
+                <div className="d-flex align-items-center mb-4">
+                  <div 
+                    className="rounded-3 d-flex align-items-center justify-content-center me-3"
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)'
+                    }}
+                  >
+                    <img 
+                      src={backlifyIcon} 
+                      alt="Backlify Logo" 
+                      width="24" 
+                      height="24"
+                      style={{ filter: 'brightness(0) invert(1)' }}
+                    />
+          </div>
+                  <span className="h4 fw-bold text-white mb-0">Backlify</span>
+                </div>
+                <p className="text-white" style={{lineHeight: '1.6'}}>
+                  The AI-powered platform for building production-ready APIs with natural language.
+                </p>
+              </Col>
+
+              <Col md={6} lg={2}>
+                <h5 className="text-white fw-semibold mb-3">Platform</h5>
+                <ul className="list-unstyled">
+                  <li className="mb-2"><a href="#" className="text-white text-decoration-none">API Builder</a></li>
+                  <li className="mb-2"><a href="#" className="text-white text-decoration-none">Documentation</a></li>
+                  <li className="mb-2"><a href="#" className="text-white text-decoration-none">Integrations</a></li>
+                </ul>
+              </Col>
+
+
+              <Col md={6} lg={2}>
+                <h5 className="text-white fw-semibold mb-3">Company</h5>
+                <ul className="list-unstyled">
+                  <li className="mb-2"><a href="/privacy" className="text-white text-decoration-none">Privacy</a></li>
+                  <li className="mb-2"><a href="/privacy" className="text-white text-decoration-none">Terms</a></li>
+                  <li className="mb-2"><a href="#" className="text-white text-decoration-none">Support</a></li>
+                </ul>
+              </Col>
+            </Row>
+
+            <Row className="pt-4 border-top">
+              <Col md={6}>
+                <p className="text-white mb-0">© 2025 Backlify. All rights reserved.</p>
+              </Col>
+              <Col md={6} className="text-md-end">
+                <div className="d-flex justify-content-md-end gap-3">
+     
+                  <a href="https://www.linkedin.com/company/backlify-ai" className="text-white">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                    </svg>
+                  </a>
+          </div>
+              </Col>
             </Row>
         </Container>
-      </section>
-
-      {/* Footer */}
-      <footer className="footer">
-        <Container>
-          <Row className="g-4" style={{justifyContent:"center", textAlign:"center"}}>
-            <Col lg={4} md={6} style={{justifyContent:"center", textAlign:"center"}}>
-                             <a href="#" style={{justifyContent:"center", textAlign:"center"}} className="navbar-brand gradient-text mb-3 d-inline-block d-flex align-items-center">
-                 <img 
-                   src={backlifyIcon} 
-                   alt="Backlify Logo" 
-                   width="20" 
-                   height="20" 
-                   className="me-2"
-                   style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(78%) saturate(2476%) hue-rotate(235deg) brightness(102%) contrast(97%)' }}
-                 />
-                 Backlify
-               </a>
-              <p className="text-secondary mb-4">The platform that makes backend creation visual and effortless. Build professional APIs without coding.</p>
-              <div className="d-flex gap-2" style={{justifyContent:"center", textAlign:"cente"}}>
-                <a href="https://www.linkedin.com/company/backlify-ai" className="social-icon"><img className="social-icon" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/LinkedIn_icon_circle.svg/640px-LinkedIn_icon_circle.svg.png" alt="Backlify LinkedIn Company Page" loading="lazy" width="24" height="24"/></a>
-              </div>
-            </Col>
-          </Row>
-          <hr className="my-4" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }} />
-          <Row className="align-items-center">
-            <Col md={6}>
-              <p className="text-secondary small mb-0">© {new Date().getFullYear()} Backlify. All rights reserved.</p>
-            </Col>
-            <Col md={6} className="text-md-end">
-              <p className="text-secondary small mb-0">Less Code, <span className="gradient-text">Build Fast.</span></p>
-            </Col>
-          </Row>
-        </Container>
       </footer>
-      
-      {/* Mobile Experience Warning Modal */}
-      <Modal show={showMobileWarning} onHide={handleCloseMobileWarning} centered>
-                 <Modal.Header closeButton>
-           <Modal.Title>💻 For the Best Experience</Modal.Title>
-         </Modal.Header>
-        <Modal.Body>
-          <p>Hello! To experience the full power and convenience of the Backlify platform, please try it on a desktop computer.</p>
-          <p className="text-secondary mb-0">We're working hard on the mobile version and it will be ready soon. Thanks for your understanding! 🚀</p>
+
+        {/* Mobile Warning Modal */}
+      <Modal show={showMobileWarning} onHide={() => setShowMobileWarning(false)} centered>
+          <Modal.Header closeButton style={{background: '#1a1a1a', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
+            <Modal.Title className="text-white">💻 For the Best Experience</Modal.Title>
+        </Modal.Header>
+          <Modal.Body style={{background: '#1a1a1a', color: '#E2E8F0'}}>
+            <p className="mb-3">
+              Hello! To experience the full power and convenience of the Backlify platform, please try it on a desktop computer.
+            </p>
+            <p className="text-white small mb-0">
+              We're working hard on the mobile version and it will be ready soon. Thanks for your understanding! 🚀
+            </p>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="primary" onClick={handleCloseMobileWarning} className="btn-gradient">
+          <Modal.Footer style={{background: '#1a1a1a', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
+            <Button 
+              className="btn-primary border-0"
+              onClick={() => setShowMobileWarning(false)}
+              style={{
+                background: 'linear-gradient(135deg, #00D2FF 0%, #3A7BD5 100%)',
+                padding: '12px 24px',
+                borderRadius: '8px'
+              }}
+            >
             Got It
           </Button>
         </Modal.Footer>
       </Modal>
-      </div>
+    </div>
     </>
   );
 };

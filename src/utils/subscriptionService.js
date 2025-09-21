@@ -41,13 +41,21 @@ class SubscriptionService {
       const result = await response.json();
       
       if (result.success && result.data) {
+        // Add missing properties to API data
+        const enhancedPlans = result.data.map((plan, index) => ({
+          ...plan,
+          isPopular: index === 1, // Make the second plan (Pro) popular
+          buttonText: this.getButtonText(plan.id, plan.name),
+          description: plan.description || this.getDescription(plan.id, plan.name)
+        }));
+        
         // Cache the result
         this.cache.set(cacheKey, {
-          data: result.data,
+          data: enhancedPlans,
           timestamp: Date.now()
         });
         
-        return result.data;
+        return enhancedPlans;
       } else {
         throw new Error('Invalid response format');
       }
@@ -59,6 +67,36 @@ class SubscriptionService {
     }
   }
 
+  // Get button text for a plan
+  getButtonText(planId, planName) {
+    const buttonTexts = {
+      'basic': 'Start Free',
+      'starter': 'Start Free',
+      'developer': 'Start Free',
+      'pro': 'Start Trial',
+      'professional': 'Start Trial',
+      'enterprise': 'Contact Sales',
+      'custom': 'Contact Sales'
+    };
+    
+    return buttonTexts[planId] || buttonTexts[planName?.toLowerCase()] || 'Get Started';
+  }
+
+  // Get description for a plan
+  getDescription(planId, planName) {
+    const descriptions = {
+      'basic': 'Perfect for learning and prototyping',
+      'starter': 'Perfect for learning and prototyping',
+      'developer': 'Perfect for learning and prototyping',
+      'pro': 'For growing businesses and teams',
+      'professional': 'For growing businesses and teams',
+      'enterprise': 'For large organizations',
+      'custom': 'For large organizations'
+    };
+    
+    return descriptions[planId] || descriptions[planName?.toLowerCase()] || 'Choose this plan';
+  }
+
   // Fallback plans if API is unavailable
   getFallbackPlans() {
     return [
@@ -67,36 +105,41 @@ class SubscriptionService {
         name: "Basic Plan",
         price: 0,
         currency: "AZN",
+        description: "Perfect for learning and prototyping",
         features: [
           "Basic API access",
           "1000 requests/month",
           "Email support"
-        ]
+        ],
+        buttonText: "Start Free"
       },
       {
         id: "pro",
         name: "Pro Plan",
-        price: 0.01,
+        price: 9.99,
         currency: "AZN",
+        description: "For growing businesses and teams",
         features: [
           "Pro API access",
           "10000 requests/month",
-          "Priority support",
-          "Custom domains"
-        ]
+          "Priority support"
+        ],
+        isPopular: true,
+        buttonText: "Start Trial"
       },
       {
         id: "enterprise",
         name: "Enterprise Plan",
-        price: 0.02,
+        price: 29.99,
         currency: "AZN",
+        description: "For large organizations",
         features: [
           "Enterprise API access",
           "Unlimited requests",
           "24/7 support",
-          "Custom integrations",
-          "SLA guarantee"
-        ]
+          "Custom integrations"
+        ],
+        buttonText: "Contact Sales"
       }
     ];
   }

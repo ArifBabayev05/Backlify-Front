@@ -57,9 +57,9 @@ function App() {
           <AppRoutes />
           <Modal show={showMobileWarning} onHide={handleDismissMobileWarning} centered>
             <Modal.Header closeButton>
-              <Modal.Title style={{ color: 'black' }}>Best Experience on Desktop</Modal.Title>
+              <Modal.Title style={{ color: 'white' }}>Best Experience on Desktop</Modal.Title>
             </Modal.Header>
-            <Modal.Body style={{ color: 'black' }}>
+            <Modal.Body style={{ color: 'white' }}>
               Backlify may not be fully optimized for mobile devices yet. For the best experience, please use a desktop or laptop computer. A dedicated mobile app is coming soon. You can continue on your phone if you prefer, but some features may be limited or feel less responsive.
             </Modal.Body>
             <Modal.Footer>
